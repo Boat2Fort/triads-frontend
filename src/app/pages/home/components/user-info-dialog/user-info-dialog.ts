@@ -8,6 +8,7 @@ import { GlobalStore } from '../../../../state/global.store'
 
 const HOW_TO_PLAY_LOTTIE_PATH = 'lotties/how-to-play-lottie.json'
 const PLAY_BUTTON_LOTTIE_PATH = 'lotties/play-button-lottie.json'
+const TRIADS_LOGO_IMAGE_PATH = 'images/triads-logo-animated.svg?v=2'
 
 @Component({
 	selector: 'app-user-info-dialog',
@@ -20,7 +21,7 @@ export class UserInfoDialog implements OnInit {
 
 	readonly logoUrl = computed(() => {
 		this.assetPreloadService.imageVersion()
-		return this.assetPreloadService.getImageUrl('images/triads-logo-animated.svg')
+		return this.assetPreloadService.getImageUrl(TRIADS_LOGO_IMAGE_PATH)
 	})
 
 	usernameInput = viewChild.required<ElementRef<HTMLInputElement>>('usernameInput')
