@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http'
 import { inject, Injectable } from '@angular/core'
 import { Observable } from 'rxjs'
 
-import { TriadGroupFormData, TriadGroupResponse } from '../interfaces/triad-group.interface'
+import { TriadGroupFormData, TriadGroupResponse, TriadGroupStats } from '../interfaces/triad-group.interface'
 
 @Injectable({
 	providedIn: 'root',
@@ -18,6 +18,10 @@ export class TriadManagementApi {
 		}
 
 		return this.httpClient.get<TriadGroupResponse[]>('triads/groups', { params })
+	}
+
+	getTriadGroupStats(): Observable<TriadGroupStats> {
+		return this.httpClient.get<TriadGroupStats>('triads/groups/stats')
 	}
 
 	createTriadGroup(data: TriadGroupFormData): Observable<TriadGroupResponse> {

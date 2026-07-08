@@ -25,6 +25,15 @@ export interface TriadGroupResponse {
 	triad4: TriadItem
 }
 
+export interface TriadGroupStats {
+	totalActive: number
+	byDifficulty: {
+		EASY: number
+		MEDIUM: number
+		HARD: number
+	}
+}
+
 export interface TriadGroupFormData {
 	difficulty: string
 	triad1: {

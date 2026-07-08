@@ -1,33 +1,56 @@
 <div class="w-full h-full flex flex-col">
 	<!-- Header Section - Sticky -->
 	<div class="shrink-0 sticky top-0 z-10 p-4 md:p-6 lg:p-8">
-		<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-			<h1 class="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-800">Manage Triads</h1>
-			<div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-				<!-- Search Input -->
-				<div class="relative flex-1 sm:flex-initial">
-					<input
-						type="text"
-						(input)="onSearchInput($event)"
-						[value]="searchQuery()"
-						placeholder="Search by keyword..."
-						class="w-full px-4 py-2 pr-10 border border-gray-300 bg-base-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-base" />
-					@if (searchQuery()) {
-						<button type="button" (click)="onClearSearch()" class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700">
-							<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<line x1="18" y1="6" x2="6" y2="18"></line>
-								<line x1="6" y1="6" x2="18" y2="18"></line>
-							</svg>
-						</button>
-					}
+		<div class="flex flex-col gap-4">
+			<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+				<h1 class="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-800">Manage Triads</h1>
+				<div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+					<!-- Search Input -->
+					<div class="relative flex-1 sm:flex-initial">
+						<input
+							type="text"
+							(input)="onSearchInput($event)"
+							[value]="searchQuery()"
+							placeholder="Search by keyword..."
+							class="w-full px-4 py-2 pr-10 border border-gray-300 bg-base-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-base" />
+						@if (searchQuery()) {
+							<button
+								type="button"
+								(click)="onClearSearch()"
+								class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700">
+								<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<line x1="18" y1="6" x2="6" y2="18"></line>
+									<line x1="6" y1="6" x2="18" y2="18"></line>
+								</svg>
+							</button>
+						}
+					</div>
+					<!-- Add Button -->
+					<button
+						type="button"
+						(click)="onAdd()"
+						class="px-4 md:px-6 py-2 bg-linear-to-r triad-gradient text-white rounded-lg hover:opacity-90 transition-opacity font-medium shadow-md">
+						Add Triad Group
+					</button>
 				</div>
-				<!-- Add Button -->
-				<button
-					type="button"
-					(click)="onAdd()"
-					class="px-4 md:px-6 py-2 bg-linear-to-r triad-gradient text-white rounded-lg hover:opacity-90 transition-opacity font-medium shadow-md">
-					Add Triad Group
-				</button>
+			</div>
+			<div class="grid grid-cols-2 sm:grid-cols-4 gap-2" aria-label="Active triad group inventory">
+				<div class="flex min-w-0 items-center justify-between gap-2 rounded-md bg-neutral-200 px-3 py-1.5 shadow-sm">
+					<span class="text-xs font-semibold uppercase text-gray-600">Total</span>
+					<span class="text-base font-bold text-gray-800">{{ triadGroupStats().totalActive }}</span>
+				</div>
+				<div class="flex min-w-0 items-center justify-between gap-2 rounded-md bg-green-500 px-3 py-1.5 text-white shadow-sm">
+					<span class="text-xs font-semibold uppercase">Easy</span>
+					<span class="text-base font-bold">{{ triadGroupStats().byDifficulty.EASY }}</span>
+				</div>
+				<div class="flex min-w-0 items-center justify-between gap-2 rounded-md bg-orange-500 px-3 py-1.5 text-white shadow-sm">
+					<span class="text-xs font-semibold uppercase">Medium</span>
+					<span class="text-base font-bold">{{ triadGroupStats().byDifficulty.MEDIUM }}</span>
+				</div>
+				<div class="flex min-w-0 items-center justify-between gap-2 rounded-md bg-red-500 px-3 py-1.5 text-white shadow-sm">
+					<span class="text-xs font-semibold uppercase">Hard</span>
+					<span class="text-base font-bold">{{ triadGroupStats().byDifficulty.HARD }}</span>
+				</div>
 			</div>
 		</div>
 	</div>

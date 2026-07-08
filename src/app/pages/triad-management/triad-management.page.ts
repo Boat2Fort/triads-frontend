@@ -11,7 +11,7 @@ import { AddTriadGroupDialog } from './components/add-triad-group-dialog/add-tri
 import { DeleteConfirmationDialog } from './components/delete-confirmation-dialog/delete-confirmation-dialog'
 import { EditTriadGroupDialog } from './components/edit-triad-group-dialog/edit-triad-group-dialog'
 import { TriadDailyScheduleHint, TriadGroupCard } from './components/triad-group-card/triad-group-card'
-import { TriadGroup, TriadGroupFormData } from './interfaces/triad-group.interface'
+import { TriadGroup, TriadGroupFormData, TriadGroupStats } from './interfaces/triad-group.interface'
 import { TriadManagementApi } from './services/triad-management-api'
 
 @Component({
@@ -24,6 +24,15 @@ import { TriadManagementApi } from './services/triad-management-api'
 })
 export class TriadManagementPage implements OnInit, OnDestroy {
 	triadGroups = signal<TriadGroup[]>([])
+
+	triadGroupStats = signal<TriadGroupStats>({
+		totalActive: 0,
+		byDifficulty: {
+			EASY: 0,
+			MEDIUM: 0,
+			HARD: 0,
+		},
+	})
 
 	isLoading = signal<boolean>(false)
 
@@ -89,6 +98,7 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 	ngOnInit() {
 		this.setupSearchDebounce()
 		this.loadTriadGroups(true)
+		this.loadTriadGroupStats()
 		this.loadDailySchedules()
 	}
 
@@ -171,6 +181,7 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 				this.showAddDialog.set(false)
 				this.addDialogApiError.set(null)
 				this.loadTriadGroups(true)
+				this.loadTriadGroupStats()
 			},
 			error: (error) => {
 				this.addDialogSubmitting.set(false)
@@ -207,6 +218,7 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 				this.selectedTriadGroup.set(null)
 				// Update the local state instead of refetching to preserve pagination
 				this.triadGroups.update((groups) => groups.map((g) => (g.id === group.id ? updatedGroup : g)))
+				this.loadTriadGroupStats()
 			},
 			error: (error) => {
 				const apiError = this.toApiError(error)
@@ -240,6 +252,7 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 				this.deleteTargetId.set(null)
 				// Remove the deleted group from local state instead of refetching to preserve pagination
 				this.triadGroups.update((groups) => groups.filter((g) => g.id !== id))
+				this.loadTriadGroupStats()
 			},
 			error: () => {
 				// Error message shown by HTTP interceptor
@@ -256,6 +269,17 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 		this.dailyScheduleApi.getSchedules(0, 100).subscribe({
 			next: (rows) => {
 				this.dailySchedules.set(rows)
+			},
+			error: () => {
+				// Error message shown by HTTP interceptor
+			},
+		})
+	}
+
+	loadTriadGroupStats() {
+		this.api.getTriadGroupStats().subscribe({
+			next: (stats) => {
+				this.triadGroupStats.set(stats)
 			},
 			error: () => {
 				// Error message shown by HTTP interceptor
@@ -300,6 +324,7 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 				this.snackbar.showSnackbar(`Triad group ${active ? 'activated' : 'deactivated'} successfully`)
 				// Update only the active property to preserve all existing data and pagination
 				this.triadGroups.update((groups) => groups.map((group) => (group.id === id ? { ...group, active: updatedGroup.active } : group)))
+				this.loadTriadGroupStats()
 			},
 			error: () => {
 				// Error message shown by HTTP interceptor

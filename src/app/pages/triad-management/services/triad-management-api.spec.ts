@@ -51,6 +51,25 @@ describe('TriadManagementApi', () => {
 		req.flush(mockResponse)
 	})
 
+	it('should fetch triad group stats', () => {
+		const mockResponse = {
+			totalActive: 6,
+			byDifficulty: {
+				EASY: 2,
+				MEDIUM: 1,
+				HARD: 3,
+			},
+		}
+
+		service.getTriadGroupStats().subscribe((response) => {
+			expect(response).toEqual(mockResponse)
+		})
+
+		const req = httpMock.expectOne('triads/groups/stats')
+		expect(req.request.method).toBe('GET')
+		req.flush(mockResponse)
+	})
+
 	it('should create a triad group', () => {
 		const mockData: TriadGroupFormData = {
 			difficulty: 'EASY',
