@@ -60,9 +60,8 @@
     font-family="Georgia,serif" fill="#2E2E2E" class="slide-letter s-s">S</text>
   <g class="slide-letter s-s" aria-label="Copyright">
     <g transform="translate(107,69)">
-      <circle cx="0" cy="0" r="6.25" fill="none" stroke="#2E2E2E" stroke-width="1.05"/>
-      <text x="0" y="2.8" text-anchor="middle" font-size="8.75" font-weight="700"
-        font-family="Georgia,serif" class="copyright-mark">c</text>
+      <text x="0" y="4.2" text-anchor="middle" font-size="15" font-weight="400"
+        font-family="Arial, Helvetica, sans-serif" class="copyright-mark">©</text>
     </g>
   </g>
 

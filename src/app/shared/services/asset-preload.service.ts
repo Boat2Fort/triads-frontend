@@ -66,7 +66,7 @@ export class AssetPreloadService {
 		'images/turn-two.png',
 		'images/turn-three.png',
 		'images/lifesaver.svg',
-		'images/triads-logo-animated.svg?v=2',
+		'images/triads-logo-animated.svg?v=3',
 		'images/triads-logo-animated.gif',
 		...AVAILABLE_SCORE_GIFS.map((score) => `${SCORE_GIF_BASE_PATH}score-${score}.gif`),
 	]

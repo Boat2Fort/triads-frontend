@@ -18,7 +18,7 @@ import { DailyReviewSummary } from '../game-play/interfaces/daily-review.interfa
 import { GamePlayApi } from '../game-play/services/game-play-api'
 import { UserInfoDialog } from './components/user-info-dialog/user-info-dialog'
 
-const TRIADS_LOGO_IMAGE_PATH = 'images/triads-logo-animated.svg?v=2'
+const TRIADS_LOGO_IMAGE_PATH = 'images/triads-logo-animated.svg?v=3'
 
 @Component({
 	selector: 'app-home',

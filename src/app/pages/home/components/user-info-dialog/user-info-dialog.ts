@@ -8,7 +8,7 @@ import { GlobalStore } from '../../../../state/global.store'
 
 const HOW_TO_PLAY_LOTTIE_PATH = 'lotties/how-to-play-lottie.json'
 const PLAY_BUTTON_LOTTIE_PATH = 'lotties/play-button-lottie.json'
-const TRIADS_LOGO_IMAGE_PATH = 'images/triads-logo-animated.svg?v=2'
+const TRIADS_LOGO_IMAGE_PATH = 'images/triads-logo-animated.svg?v=3'
 
 @Component({
 	selector: 'app-user-info-dialog',
