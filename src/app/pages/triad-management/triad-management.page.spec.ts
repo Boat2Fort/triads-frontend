@@ -1,6 +1,6 @@
 import { HttpClientTestingModule } from '@angular/common/http/testing'
 import { ComponentFixture, TestBed } from '@angular/core/testing'
-import { of } from 'rxjs'
+import { of, throwError } from 'rxjs'
 
 import { DailyScheduleAdminApi } from '../../shared/services/daily-schedule-admin-api'
 import { SnackbarService } from '../../shared/services/snackbar.service'
@@ -115,6 +115,34 @@ describe('TriadManagementPage', () => {
 		expect(api.getTriadGroupStats).toHaveBeenCalledWith()
 	})
 
+	it('loads all daily schedule pages for assigned schedule hints', () => {
+		const firstPage = Array.from({ length: 100 }, (_, i) => ({
+			id: i + 1,
+			puzzleDate: `2026-08-${String((i % 30) + 1).padStart(2, '0')}`,
+			triadGroupId: i + 1,
+		}))
+		const secondPage = [{ id: 101, puzzleDate: '2026-07-10', triadGroupId: 999 }]
+		dailyScheduleApi.getSchedules.calls.reset()
+		dailyScheduleApi.getSchedules.and.returnValues(of(firstPage), of(secondPage))
+
+		component.loadDailySchedules()
+
+		expect(dailyScheduleApi.getSchedules.calls.allArgs()).toEqual([
+			[0, 100],
+			[100, 100],
+		])
+		expect(component.scheduleHintForGroup(999)).toEqual({ dateYmd: '2026-07-10', rowId: 101 })
+	})
+
+	it('uses the single assigned date from the schedule feed as the schedule hint', () => {
+		dailyScheduleApi.getSchedules.calls.reset()
+		dailyScheduleApi.getSchedules.and.returnValue(of([{ id: 9, puzzleDate: '2026-07-12', triadGroupId: 42 }]))
+
+		component.loadDailySchedules()
+
+		expect(component.scheduleHintForGroup(42)).toEqual({ dateYmd: '2026-07-12', rowId: 9 })
+	})
+
 	it('refreshes stats after creating a triad group', () => {
 		const createdGroup = triadGroup(99, 'new unscheduled')
 		api.createTriadGroup.and.returnValue(of(createdGroup))
@@ -138,6 +166,18 @@ describe('TriadManagementPage', () => {
 		expect(component.loadTriadGroupStats).toHaveBeenCalled()
 	})
 
+	it('reloads the first ordered page after editing a triad group', () => {
+		const existingGroup = triadGroup(1, 'existing')
+		const updatedGroup = { ...existingGroup, difficulty: 'HARD' }
+		component.selectedTriadGroup.set(existingGroup)
+		api.updateTriadGroup.and.returnValue(of(updatedGroup))
+		spyOn(component, 'loadTriadGroups')
+
+		component.onEditDialogSaved(formData)
+
+		expect(component.loadTriadGroups).toHaveBeenCalledOnceWith(true)
+	})
+
 	it('refreshes stats after deleting a triad group', () => {
 		component.deleteTargetId.set(1)
 		api.deleteTriadGroup.and.returnValue(of(undefined))
@@ -158,5 +198,42 @@ describe('TriadManagementPage', () => {
 
 		expect(api.toggleTriadGroupStatus).toHaveBeenCalledWith(1, false)
 		expect(component.loadTriadGroupStats).toHaveBeenCalled()
+	})
+
+	it('reloads the first ordered page after scheduling a daily puzzle', () => {
+		const group = triadGroup(1, 'scheduled')
+		dailyScheduleApi.createSchedule.and.returnValue(of({ id: 7, puzzleDate: '2026-07-10', triadGroupId: group.id }))
+		spyOn(component, 'loadDailySchedules')
+		spyOn(component, 'loadTriadGroups')
+
+		component.onDailyScheduleSubmit({ triadGroup: group, puzzleDate: '2026-07-10' })
+
+		expect(dailyScheduleApi.createSchedule).toHaveBeenCalledWith('2026-07-10', group.id)
+		expect(component.loadDailySchedules).toHaveBeenCalled()
+		expect(component.loadTriadGroups).toHaveBeenCalledOnceWith(true)
+	})
+
+	it('reloads the first ordered page after removing a daily schedule', () => {
+		dailyScheduleApi.deleteSchedule.and.returnValue(of(undefined))
+		spyOn(component, 'loadDailySchedules')
+		spyOn(component, 'loadTriadGroups')
+
+		component.onUnscheduleDailyRow(7)
+
+		expect(dailyScheduleApi.deleteSchedule).toHaveBeenCalledWith(7)
+		expect(component.loadDailySchedules).toHaveBeenCalled()
+		expect(component.loadTriadGroups).toHaveBeenCalledOnceWith(true)
+	})
+
+	it('leaves schedule state for the interceptor when removing a schedule is rejected', () => {
+		dailyScheduleApi.deleteSchedule.and.returnValue(throwError(() => new Error('Today and past daily schedules cannot be removed.')))
+		spyOn(component, 'loadDailySchedules')
+		spyOn(component, 'loadTriadGroups')
+
+		component.onUnscheduleDailyRow(7)
+
+		expect(dailyScheduleApi.deleteSchedule).toHaveBeenCalledWith(7)
+		expect(component.loadDailySchedules).not.toHaveBeenCalled()
+		expect(component.loadTriadGroups).not.toHaveBeenCalled()
 	})
 })

@@ -6,7 +6,7 @@ import { Difficulty } from '../../../../shared/enums/difficulty.enum'
 import { HighlightKeyPipe } from '../../../../shared/pipes/highlight-key.pipe'
 import { TriadGroup } from '../../interfaces/triad-group.interface'
 
-/** Earliest Eastern puzzle date scheduled for this triad group (from admin API). */
+/** Assigned Eastern puzzle date scheduled for this triad group (from admin API). */
 export interface TriadDailyScheduleHint {
 	dateYmd: string
 	rowId: number
@@ -33,7 +33,7 @@ export class TriadGroupCard {
 
 	unscheduleClicked = output<number>()
 
-	/** Earliest scheduled Eastern date for this group, if any. */
+	/** Assigned scheduled Eastern date for this group, if any. */
 	scheduleHint = input<TriadDailyScheduleHint | null>(null)
 
 	/** Bumped by parent after a successful schedule so each card clears its date field. */

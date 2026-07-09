@@ -61,20 +61,12 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 	/** Passed to triad cards to clear date inputs after a successful schedule. */
 	scheduleDraftResetVersion = signal(0)
 
-	/** Earliest scheduled Eastern date per triad group (for display + unschedule). */
+	/** Assigned Eastern puzzle date per triad group (for display + unschedule). */
 	readonly scheduleHintByGroupId = computed(() => {
 		const rows = this.dailySchedules()
-		const grouped = new Map<number, DailyScheduleRow[]>()
-		for (const r of rows) {
-			const list = grouped.get(r.triadGroupId) ?? []
-			list.push(r)
-			grouped.set(r.triadGroupId, list)
-		}
 		const out = new Map<number, TriadDailyScheduleHint>()
-		for (const [groupId, list] of grouped) {
-			list.sort((a, b) => a.puzzleDate.localeCompare(b.puzzleDate))
-			const row = list[0]
-			out.set(groupId, { dateYmd: row.puzzleDate, rowId: row.id })
+		for (const r of rows) {
+			out.set(r.triadGroupId, { dateYmd: r.puzzleDate, rowId: r.id })
 		}
 		return out
 	})
@@ -82,6 +74,10 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 	private offset = 0
 
 	private readonly limit = 20
+
+	private readonly dailySchedulePageLimit = 100
+
+	private dailySchedulesLoadVersion = 0
 
 	private readonly destroy$ = new Subject<void>()
 
@@ -211,13 +207,12 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 		}
 
 		this.api.updateTriadGroup(group.id, data).subscribe({
-			next: (updatedGroup) => {
+			next: () => {
 				this.snackbar.showSnackbar('Triad group updated successfully')
 				this.showEditDialog.set(false)
 				this.editDialogApiError.set(null)
 				this.selectedTriadGroup.set(null)
-				// Update the local state instead of refetching to preserve pagination
-				this.triadGroups.update((groups) => groups.map((g) => (g.id === group.id ? updatedGroup : g)))
+				this.loadTriadGroups(true)
 				this.loadTriadGroupStats()
 			},
 			error: (error) => {
@@ -266,9 +261,24 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 	}
 
 	loadDailySchedules() {
-		this.dailyScheduleApi.getSchedules(0, 100).subscribe({
+		const loadVersion = ++this.dailySchedulesLoadVersion
+		this.loadDailySchedulePage(0, [], loadVersion)
+	}
+
+	private loadDailySchedulePage(offset: number, accumulated: DailyScheduleRow[], loadVersion: number) {
+		this.dailyScheduleApi.getSchedules(offset, this.dailySchedulePageLimit).subscribe({
 			next: (rows) => {
-				this.dailySchedules.set(rows)
+				if (loadVersion !== this.dailySchedulesLoadVersion) {
+					return
+				}
+
+				const schedules = [...accumulated, ...rows]
+				if (rows.length >= this.dailySchedulePageLimit) {
+					this.loadDailySchedulePage(offset + this.dailySchedulePageLimit, schedules, loadVersion)
+					return
+				}
+
+				this.dailySchedules.set(schedules)
 			},
 			error: () => {
 				// Error message shown by HTTP interceptor
@@ -297,6 +307,7 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 				this.snackbar.showSnackbar('Schedule entry removed')
 				this.scheduleDraftResetVersion.update((v) => v + 1)
 				this.loadDailySchedules()
+				this.loadTriadGroups(true)
 			},
 			error: () => {
 				// Error message shown by HTTP interceptor
@@ -311,6 +322,7 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 				this.snackbar.showSnackbar('Daily puzzle scheduled')
 				this.scheduleDraftResetVersion.update((v) => v + 1)
 				this.loadDailySchedules()
+				this.loadTriadGroups(true)
 			},
 			error: () => {
 				// Error message shown by HTTP interceptor
