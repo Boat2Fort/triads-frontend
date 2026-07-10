@@ -143,6 +143,46 @@ describe('TriadManagementPage', () => {
 		expect(component.scheduleHintForGroup(42)).toEqual({ dateYmd: '2026-07-12', rowId: 9 })
 	})
 
+	it('shows the first available puzzle date after the latest assigned puzzle date', () => {
+		component.dailySchedules.set([
+			{ id: 1, puzzleDate: '2026-08-10', triadGroupId: 10 },
+			{ id: 2, puzzleDate: '2026-08-31', triadGroupId: 20 },
+			{ id: 3, puzzleDate: '2026-08-12', triadGroupId: 30 },
+		])
+
+		fixture.detectChanges()
+
+		const jumpButton = fixture.nativeElement.querySelector('button[aria-label^="Jump to the first unscheduled triad group"]') as HTMLButtonElement
+		expect(component.firstAvailablePuzzleDateYmd()).toBe('2026-09-01')
+		expect(jumpButton.textContent).toContain('2026-09-01')
+	})
+
+	it('loads ordered pages until the first unscheduled group is available for the schedule jump', () => {
+		const scheduledGroups = Array.from({ length: 20 }, (_, index) => triadGroup(index + 1, `scheduled ${index + 1}`))
+		const firstUnscheduled = triadGroup(99, 'first unscheduled')
+		component.dailySchedules.set(
+			scheduledGroups.map((group, index) => ({
+				id: index + 1,
+				puzzleDate: `2026-08-${String(index + 1).padStart(2, '0')}`,
+				triadGroupId: group.id,
+			})),
+		)
+		component.searchQuery.set('apple')
+		api.getTriadGroups.calls.reset()
+		api.getTriadGroups.and.returnValues(of(scheduledGroups), of([firstUnscheduled]))
+
+		component.onJumpToScheduleBoundary()
+
+		expect(component.searchQuery()).toBe('')
+		expect(api.getTriadGroups.calls.allArgs()).toEqual([
+			[0, 20, ''],
+			[20, 20, ''],
+		])
+		expect(component.triadGroups().at(-1)).toEqual(firstUnscheduled)
+		expect(component.hasMore()).toBeFalse()
+		expect(component.isJumpingToScheduleBoundary()).toBeFalse()
+	})
+
 	it('refreshes stats after creating a triad group', () => {
 		const createdGroup = triadGroup(99, 'new unscheduled')
 		api.createTriadGroup.and.returnValue(of(createdGroup))
@@ -200,8 +240,10 @@ describe('TriadManagementPage', () => {
 		expect(component.loadTriadGroupStats).toHaveBeenCalled()
 	})
 
-	it('reloads the first ordered page after scheduling a daily puzzle', () => {
+	it('updates schedule hints without reloading the ordered list after scheduling a daily puzzle', () => {
 		const group = triadGroup(1, 'scheduled')
+		const existingLoadedGroup = triadGroup(99, 'visible group')
+		component.triadGroups.set([existingLoadedGroup, group])
 		dailyScheduleApi.createSchedule.and.returnValue(of({ id: 7, puzzleDate: '2026-07-10', triadGroupId: group.id }))
 		spyOn(component, 'loadDailySchedules')
 		spyOn(component, 'loadTriadGroups')
@@ -209,8 +251,10 @@ describe('TriadManagementPage', () => {
 		component.onDailyScheduleSubmit({ triadGroup: group, puzzleDate: '2026-07-10' })
 
 		expect(dailyScheduleApi.createSchedule).toHaveBeenCalledWith('2026-07-10', group.id)
+		expect(component.scheduleHintForGroup(group.id)).toEqual({ dateYmd: '2026-07-10', rowId: 7 })
+		expect(component.triadGroups()).toEqual([existingLoadedGroup, group])
 		expect(component.loadDailySchedules).toHaveBeenCalled()
-		expect(component.loadTriadGroups).toHaveBeenCalledOnceWith(true)
+		expect(component.loadTriadGroups).not.toHaveBeenCalled()
 	})
 
 	it('reloads the first ordered page after removing a daily schedule', () => {

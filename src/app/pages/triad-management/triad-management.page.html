@@ -25,6 +25,15 @@
 							</button>
 						}
 					</div>
+					<button
+						type="button"
+						(click)="onJumpToScheduleBoundary()"
+						[disabled]="isLoading() || isJumpingToScheduleBoundary() || isLoadingDailySchedules()"
+						class="px-4 py-2 rounded-lg border border-violet-200 bg-base-100 text-violet-700 hover:bg-violet-50 transition-colors text-sm font-semibold shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+						[attr.aria-label]="'Jump to the first unscheduled triad group for ' + firstAvailablePuzzleDateYmd()">
+						<span class="block text-[10px] leading-none uppercase text-gray-500">Next open</span>
+						<span class="block leading-tight">{{ firstAvailablePuzzleDateYmd() }}</span>
+					</button>
 					<!-- Add Button -->
 					<button
 						type="button"
@@ -70,6 +79,7 @@
 			} @else {
 				@for (group of triadGroups(); track group.id) {
 					<app-triad-group-card
+						[attr.data-triad-group-id]="group.id"
 						[triadGroup]="group"
 						[scheduleHint]="scheduleHintForGroup(group.id)"
 						[scheduleDraftResetVersion]="scheduleDraftResetVersion()"

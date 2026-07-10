@@ -1,8 +1,21 @@
-import { ChangeDetectionStrategy, Component, computed, ElementRef, inject, OnDestroy, OnInit, signal, viewChild } from '@angular/core'
+import {
+	afterNextRender,
+	ChangeDetectionStrategy,
+	Component,
+	computed,
+	ElementRef,
+	inject,
+	Injector,
+	OnDestroy,
+	OnInit,
+	signal,
+	viewChild,
+} from '@angular/core'
 import { IonModal } from '@ionic/angular/standalone'
 import { Subject, takeUntil } from 'rxjs'
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators'
 
+import { minDailySchedulePuzzleDateYmd } from '../../shared/constants/daily-schedule.constant'
 import { ApiError } from '../../shared/errors/api-error.model'
 import { isApiError, parseApiError } from '../../shared/errors/api-error.util'
 import { DailyScheduleAdminApi, DailyScheduleRow } from '../../shared/services/daily-schedule-admin-api'
@@ -61,6 +74,10 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 	/** Passed to triad cards to clear date inputs after a successful schedule. */
 	scheduleDraftResetVersion = signal(0)
 
+	isJumpingToScheduleBoundary = signal(false)
+
+	isLoadingDailySchedules = signal(false)
+
 	/** Assigned Eastern puzzle date per triad group (for display + unschedule). */
 	readonly scheduleHintByGroupId = computed(() => {
 		const rows = this.dailySchedules()
@@ -69,6 +86,17 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 			out.set(r.triadGroupId, { dateYmd: r.puzzleDate, rowId: r.id })
 		}
 		return out
+	})
+
+	readonly firstAvailablePuzzleDateYmd = computed(() => {
+		const today = minDailySchedulePuzzleDateYmd()
+		const latestScheduleDate = this.dailySchedules().reduce((latest, row) => (row.puzzleDate.localeCompare(latest) > 0 ? row.puzzleDate : latest), '')
+		if (!latestScheduleDate) {
+			return today
+		}
+
+		const nextDate = this.addDaysToYmd(latestScheduleDate, 1)
+		return nextDate.localeCompare(today) < 0 ? today : nextDate
 	})
 
 	private offset = 0
@@ -82,6 +110,8 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 	private readonly destroy$ = new Subject<void>()
 
 	private readonly searchSubject = new Subject<string>()
+
+	private readonly injector = inject(Injector)
 
 	private readonly api = inject(TriadManagementApi)
 
@@ -111,6 +141,20 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 
 	onClearSearch() {
 		this.searchSubject.next('')
+	}
+
+	onJumpToScheduleBoundary() {
+		if (this.isLoading() || this.isJumpingToScheduleBoundary() || this.isLoadingDailySchedules()) {
+			return
+		}
+
+		this.searchQuery.set('')
+		this.searchSubject.next('')
+		this.offset = 0
+		this.triadGroups.set([])
+		this.hasMore.set(true)
+		this.isJumpingToScheduleBoundary.set(true)
+		this.loadUntilScheduleBoundary(0, [])
 	}
 
 	loadTriadGroups(reset: boolean) {
@@ -262,6 +306,7 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 
 	loadDailySchedules() {
 		const loadVersion = ++this.dailySchedulesLoadVersion
+		this.isLoadingDailySchedules.set(true)
 		this.loadDailySchedulePage(0, [], loadVersion)
 	}
 
@@ -279,8 +324,12 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 				}
 
 				this.dailySchedules.set(schedules)
+				this.isLoadingDailySchedules.set(false)
 			},
 			error: () => {
+				if (loadVersion === this.dailySchedulesLoadVersion) {
+					this.isLoadingDailySchedules.set(false)
+				}
 				// Error message shown by HTTP interceptor
 			},
 		})
@@ -318,11 +367,11 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 	onDailyScheduleSubmit(payload: { triadGroup: TriadGroup; puzzleDate: string }) {
 		const { triadGroup, puzzleDate } = payload
 		this.dailyScheduleApi.createSchedule(puzzleDate, triadGroup.id).subscribe({
-			next: () => {
+			next: (schedule) => {
 				this.snackbar.showSnackbar('Daily puzzle scheduled')
+				this.upsertDailySchedule(schedule)
 				this.scheduleDraftResetVersion.update((v) => v + 1)
 				this.loadDailySchedules()
-				this.loadTriadGroups(true)
 			},
 			error: () => {
 				// Error message shown by HTTP interceptor
@@ -346,9 +395,98 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 
 	private setupSearchDebounce() {
 		this.searchSubject.pipe(debounceTime(300), distinctUntilChanged(), takeUntil(this.destroy$)).subscribe((query) => {
+			if (query === this.searchQuery()) {
+				return
+			}
+
 			this.searchQuery.set(query)
 			this.loadTriadGroups(true)
 		})
+	}
+
+	private upsertDailySchedule(schedule: DailyScheduleRow) {
+		this.dailySchedules.update((rows) => [...rows.filter((row) => row.id !== schedule.id && row.triadGroupId !== schedule.triadGroupId), schedule])
+	}
+
+	private loadUntilScheduleBoundary(offset: number, accumulated: TriadGroup[]) {
+		this.isLoading.set(true)
+		this.api.getTriadGroups(offset, this.limit, this.searchQuery()).subscribe({
+			next: (response) => {
+				const groups = [...accumulated, ...response]
+				const hasMore = response.length >= this.limit
+				this.triadGroups.set(groups)
+				this.hasMore.set(hasMore)
+				this.offset = offset + this.limit
+
+				const targetGroupId = this.findScheduleBoundaryTargetId(groups, !hasMore)
+				if (targetGroupId !== null) {
+					this.finishScheduleBoundaryJump(targetGroupId)
+					return
+				}
+
+				if (hasMore) {
+					this.loadUntilScheduleBoundary(offset + this.limit, groups)
+					return
+				}
+
+				this.finishScheduleBoundaryJump(null)
+			},
+			error: () => {
+				this.isLoading.set(false)
+				this.isJumpingToScheduleBoundary.set(false)
+			},
+		})
+	}
+
+	private findScheduleBoundaryTargetId(groups: TriadGroup[], reachedEnd: boolean): number | null {
+		const hintByGroupId = this.scheduleHintByGroupId()
+		const firstUnscheduled = groups.find((group) => !hintByGroupId.has(group.id))
+		if (firstUnscheduled) {
+			return firstUnscheduled.id
+		}
+
+		if (reachedEnd && groups.length > 0) {
+			return groups[groups.length - 1].id
+		}
+
+		return null
+	}
+
+	private finishScheduleBoundaryJump(targetGroupId: number | null) {
+		this.isLoading.set(false)
+		this.isJumpingToScheduleBoundary.set(false)
+		this.scrollToTriadGroupAfterRender(targetGroupId)
+	}
+
+	private scrollToTriadGroupAfterRender(groupId: number | null): void {
+		afterNextRender(
+			() => {
+				const container = this.scrollContainer()?.nativeElement
+				if (!container) {
+					return
+				}
+
+				if (groupId === null) {
+					container.scrollTo({ top: 0, behavior: 'smooth' })
+					return
+				}
+
+				const target = container.querySelector<HTMLElement>(`[data-triad-group-id="${groupId}"]`)
+				if (target) {
+					target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+					return
+				}
+
+				container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+			},
+			{ injector: this.injector },
+		)
+	}
+
+	private addDaysToYmd(value: string, days: number): string {
+		const [year, month, day] = value.split('-').map(Number)
+		const date = new Date(Date.UTC(year, month - 1, day + days))
+		return date.toISOString().slice(0, 10)
 	}
 
 	private toApiError(error: unknown): ApiError {
