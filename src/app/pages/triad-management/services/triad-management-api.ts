@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http'
 import { inject, Injectable } from '@angular/core'
 import { Observable } from 'rxjs'
 
+import { Difficulty } from '../../../shared/enums/difficulty.enum'
 import { TriadGroupFormData, TriadGroupResponse, TriadGroupStats } from '../interfaces/triad-group.interface'
 
 @Injectable({
@@ -10,11 +11,15 @@ import { TriadGroupFormData, TriadGroupResponse, TriadGroupStats } from '../inte
 export class TriadManagementApi {
 	private readonly httpClient = inject(HttpClient)
 
-	getTriadGroups(offset: number, limit: number, search?: string): Observable<TriadGroupResponse[]> {
+	getTriadGroups(offset: number, limit: number, search?: string, difficulty?: Difficulty | null): Observable<TriadGroupResponse[]> {
 		let params = new HttpParams().set('offset', offset.toString()).set('limit', limit.toString())
 
 		if (search && search.trim()) {
 			params = params.set('search', search.trim())
+		}
+
+		if (difficulty) {
+			params = params.set('difficulty', difficulty)
 		}
 
 		return this.httpClient.get<TriadGroupResponse[]>('triads/groups', { params })

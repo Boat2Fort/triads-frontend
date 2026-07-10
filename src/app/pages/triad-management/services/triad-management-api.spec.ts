@@ -1,6 +1,7 @@
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing'
 import { TestBed } from '@angular/core/testing'
 
+import { Difficulty } from '../../../shared/enums/difficulty.enum'
 import { TriadGroupFormData, TriadGroupResponse } from '../interfaces/triad-group.interface'
 import { TriadManagementApi } from './triad-management-api'
 
@@ -36,6 +37,7 @@ describe('TriadManagementApi', () => {
 			(request) => request.url.includes('triads/groups') && request.params.get('offset') === '0' && request.params.get('limit') === '20',
 		)
 		expect(req.request.method).toBe('GET')
+		expect(req.request.params.has('difficulty')).toBeFalse()
 		req.flush(mockResponse)
 	})
 
@@ -47,6 +49,21 @@ describe('TriadManagementApi', () => {
 		})
 
 		const req = httpMock.expectOne((request) => request.url.includes('triads/groups') && request.params.get('search') === 'test')
+		expect(req.request.method).toBe('GET')
+		req.flush(mockResponse)
+	})
+
+	it('should fetch triad groups with search and difficulty', () => {
+		const mockResponse: TriadGroupResponse[] = []
+
+		service.getTriadGroups(0, 20, 'test', Difficulty.MEDIUM).subscribe((response) => {
+			expect(response).toEqual(mockResponse)
+		})
+
+		const req = httpMock.expectOne(
+			(request) =>
+				request.url.includes('triads/groups') && request.params.get('search') === 'test' && request.params.get('difficulty') === Difficulty.MEDIUM,
+		)
 		expect(req.request.method).toBe('GET')
 		req.flush(mockResponse)
 	})

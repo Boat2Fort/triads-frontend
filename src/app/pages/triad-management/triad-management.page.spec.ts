@@ -2,6 +2,7 @@ import { HttpClientTestingModule } from '@angular/common/http/testing'
 import { ComponentFixture, TestBed } from '@angular/core/testing'
 import { of, throwError } from 'rxjs'
 
+import { Difficulty } from '../../shared/enums/difficulty.enum'
 import { DailyScheduleAdminApi } from '../../shared/services/daily-schedule-admin-api'
 import { SnackbarService } from '../../shared/services/snackbar.service'
 import { TriadGroup, TriadGroupFormData } from './interfaces/triad-group.interface'
@@ -107,6 +108,27 @@ describe('TriadManagementPage', () => {
 		expect(component.triadGroupStats().byDifficulty.HARD).toBe(3)
 	})
 
+	it('reloads the list with the selected difficulty while preserving search', () => {
+		api.getTriadGroups.calls.reset()
+		component.searchQuery.set('apple')
+
+		component.onDifficultyFilterSelected(Difficulty.MEDIUM)
+
+		expect(component.selectedDifficulty()).toBe(Difficulty.MEDIUM)
+		expect(api.getTriadGroups).toHaveBeenCalledOnceWith(0, 20, 'apple', Difficulty.MEDIUM)
+	})
+
+	it('clears only the difficulty filter when Total is selected', () => {
+		component.searchQuery.set('apple')
+		component.selectedDifficulty.set(Difficulty.MEDIUM)
+		api.getTriadGroups.calls.reset()
+
+		component.onClearDifficultyFilter()
+
+		expect(component.selectedDifficulty()).toBeNull()
+		expect(api.getTriadGroups).toHaveBeenCalledOnceWith(0, 20, 'apple', null)
+	})
+
 	it('loads stats independently of search state', () => {
 		component.searchQuery.set('apple')
 
@@ -175,12 +197,23 @@ describe('TriadManagementPage', () => {
 
 		expect(component.searchQuery()).toBe('')
 		expect(api.getTriadGroups.calls.allArgs()).toEqual([
-			[0, 20, ''],
-			[20, 20, ''],
+			[0, 20, '', null],
+			[20, 20, '', null],
 		])
 		expect(component.triadGroups().at(-1)).toEqual(firstUnscheduled)
 		expect(component.hasMore()).toBeFalse()
 		expect(component.isJumpingToScheduleBoundary()).toBeFalse()
+	})
+
+	it('clears the difficulty filter before jumping to the next open schedule boundary', () => {
+		component.selectedDifficulty.set(Difficulty.HARD)
+		api.getTriadGroups.calls.reset()
+		api.getTriadGroups.and.returnValue(of([]))
+
+		component.onJumpToScheduleBoundary()
+
+		expect(component.selectedDifficulty()).toBeNull()
+		expect(api.getTriadGroups).toHaveBeenCalledOnceWith(0, 20, '', null)
 	})
 
 	it('refreshes stats after creating a triad group', () => {

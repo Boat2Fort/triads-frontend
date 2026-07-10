@@ -44,22 +44,46 @@
 				</div>
 			</div>
 			<div class="grid grid-cols-2 sm:grid-cols-4 gap-2" aria-label="Active triad group inventory">
-				<div class="flex min-w-0 items-center justify-between gap-2 rounded-md bg-neutral-200 px-3 py-1.5 shadow-sm">
+				<button
+					type="button"
+					(click)="onClearDifficultyFilter()"
+					[disabled]="isLoading()"
+					[attr.aria-pressed]="selectedDifficulty() === null"
+					[class.ring-2]="selectedDifficulty() === null"
+					class="flex min-w-0 items-center justify-between gap-2 rounded-md bg-neutral-200 px-3 py-1.5 text-left shadow-sm transition hover:bg-neutral-300 focus:outline-none focus:ring-2 focus:ring-gray-700 disabled:cursor-not-allowed disabled:opacity-60">
 					<span class="text-xs font-semibold uppercase text-gray-600">Total</span>
 					<span class="text-base font-bold text-gray-800">{{ triadGroupStats().totalActive }}</span>
-				</div>
-				<div class="flex min-w-0 items-center justify-between gap-2 rounded-md bg-green-500 px-3 py-1.5 text-white shadow-sm">
+				</button>
+				<button
+					type="button"
+					(click)="onDifficultyFilterSelected(Difficulty.EASY)"
+					[disabled]="isLoading()"
+					[attr.aria-pressed]="selectedDifficulty() === Difficulty.EASY"
+					[class.ring-2]="selectedDifficulty() === Difficulty.EASY"
+					class="flex min-w-0 items-center justify-between gap-2 rounded-md bg-green-500 px-3 py-1.5 text-left text-white shadow-sm transition hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-gray-700 disabled:cursor-not-allowed disabled:opacity-60">
 					<span class="text-xs font-semibold uppercase">Easy</span>
 					<span class="text-base font-bold">{{ triadGroupStats().byDifficulty.EASY }}</span>
-				</div>
-				<div class="flex min-w-0 items-center justify-between gap-2 rounded-md bg-orange-500 px-3 py-1.5 text-white shadow-sm">
+				</button>
+				<button
+					type="button"
+					(click)="onDifficultyFilterSelected(Difficulty.MEDIUM)"
+					[disabled]="isLoading()"
+					[attr.aria-pressed]="selectedDifficulty() === Difficulty.MEDIUM"
+					[class.ring-2]="selectedDifficulty() === Difficulty.MEDIUM"
+					class="flex min-w-0 items-center justify-between gap-2 rounded-md bg-orange-500 px-3 py-1.5 text-left text-white shadow-sm transition hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-gray-700 disabled:cursor-not-allowed disabled:opacity-60">
 					<span class="text-xs font-semibold uppercase">Medium</span>
 					<span class="text-base font-bold">{{ triadGroupStats().byDifficulty.MEDIUM }}</span>
-				</div>
-				<div class="flex min-w-0 items-center justify-between gap-2 rounded-md bg-red-500 px-3 py-1.5 text-white shadow-sm">
+				</button>
+				<button
+					type="button"
+					(click)="onDifficultyFilterSelected(Difficulty.HARD)"
+					[disabled]="isLoading()"
+					[attr.aria-pressed]="selectedDifficulty() === Difficulty.HARD"
+					[class.ring-2]="selectedDifficulty() === Difficulty.HARD"
+					class="flex min-w-0 items-center justify-between gap-2 rounded-md bg-red-500 px-3 py-1.5 text-left text-white shadow-sm transition hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-gray-700 disabled:cursor-not-allowed disabled:opacity-60">
 					<span class="text-xs font-semibold uppercase">Hard</span>
 					<span class="text-base font-bold">{{ triadGroupStats().byDifficulty.HARD }}</span>
-				</div>
+				</button>
 			</div>
 		</div>
 	</div>

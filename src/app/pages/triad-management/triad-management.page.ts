@@ -16,6 +16,7 @@ import { Subject, takeUntil } from 'rxjs'
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators'
 
 import { minDailySchedulePuzzleDateYmd } from '../../shared/constants/daily-schedule.constant'
+import { Difficulty } from '../../shared/enums/difficulty.enum'
 import { ApiError } from '../../shared/errors/api-error.model'
 import { isApiError, parseApiError } from '../../shared/errors/api-error.util'
 import { DailyScheduleAdminApi, DailyScheduleRow } from '../../shared/services/daily-schedule-admin-api'
@@ -53,6 +54,8 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 
 	searchQuery = signal<string>('')
 
+	selectedDifficulty = signal<Difficulty | null>(null)
+
 	showAddDialog = signal<boolean>(false)
 
 	addDialogApiError = signal<ApiError | null>(null)
@@ -77,6 +80,8 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 	isJumpingToScheduleBoundary = signal(false)
 
 	isLoadingDailySchedules = signal(false)
+
+	readonly Difficulty = Difficulty
 
 	/** Assigned Eastern puzzle date per triad group (for display + unschedule). */
 	readonly scheduleHintByGroupId = computed(() => {
@@ -143,6 +148,24 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 		this.searchSubject.next('')
 	}
 
+	onDifficultyFilterSelected(difficulty: Difficulty) {
+		if (this.isLoading()) {
+			return
+		}
+
+		this.selectedDifficulty.set(difficulty)
+		this.loadTriadGroups(true)
+	}
+
+	onClearDifficultyFilter() {
+		if (this.isLoading()) {
+			return
+		}
+
+		this.selectedDifficulty.set(null)
+		this.loadTriadGroups(true)
+	}
+
 	onJumpToScheduleBoundary() {
 		if (this.isLoading() || this.isJumpingToScheduleBoundary() || this.isLoadingDailySchedules()) {
 			return
@@ -150,6 +173,7 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 
 		this.searchQuery.set('')
 		this.searchSubject.next('')
+		this.selectedDifficulty.set(null)
 		this.offset = 0
 		this.triadGroups.set([])
 		this.hasMore.set(true)
@@ -169,7 +193,7 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 
 		this.isLoading.set(true)
 
-		this.api.getTriadGroups(this.offset, this.limit, this.searchQuery()).subscribe({
+		this.api.getTriadGroups(this.offset, this.limit, this.searchQuery(), this.selectedDifficulty()).subscribe({
 			next: (response) => {
 				if (reset) {
 					this.triadGroups.set(response)
@@ -410,7 +434,7 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 
 	private loadUntilScheduleBoundary(offset: number, accumulated: TriadGroup[]) {
 		this.isLoading.set(true)
-		this.api.getTriadGroups(offset, this.limit, this.searchQuery()).subscribe({
+		this.api.getTriadGroups(offset, this.limit, this.searchQuery(), this.selectedDifficulty()).subscribe({
 			next: (response) => {
 				const groups = [...accumulated, ...response]
 				const hasMore = response.length >= this.limit
