@@ -40,7 +40,7 @@
 								<button
 									type="button"
 									class="home-daily-completed-action-btn btn btn-outline btn-xs min-w-0 flex-1 md:btn-lg hover:bg-info shadow-md"
-									[disabled]="completedDailySummaryLoading()"
+									[disabled]="completedDailySummaryLoading() || !completedDailySummary()"
 									(click)="onShareCompletedDaily()"
 									aria-label="Share daily result">
 									<svg

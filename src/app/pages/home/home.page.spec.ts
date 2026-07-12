@@ -118,10 +118,19 @@ describe('HomePage', () => {
 		expect(component.reviewDialogOpen()).toBeTrue()
 	})
 
-	it('shares the completed daily result from the home page', async () => {
-		await component.onShareCompletedDaily()
+	it('shares the completed daily result synchronously to preserve Safari user activation', () => {
+		component.onShareCompletedDaily()
 
 		expect(dailyPostPlayService.shareScoreImage).toHaveBeenCalledWith(8, '2026-04-20')
+	})
+
+	it('does not share before the completed daily summary is available', () => {
+		component.completedDailySummary.set(null)
+
+		component.onShareCompletedDaily()
+
+		expect(dailyPostPlayService.shareScoreImage).not.toHaveBeenCalled()
+		expect(dailyPostPlayService.loadCompletedDailySummary).toHaveBeenCalled()
 	})
 
 	// ADR-0002: stale post-Daily popups must not linger over a refreshed home view after a rollover.

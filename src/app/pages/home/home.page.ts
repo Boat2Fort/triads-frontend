@@ -128,13 +128,17 @@ export class HomePage implements OnInit, OnDestroy {
 		this.playMoreDialogOpen.set(false)
 	}
 
-	async onShareCompletedDaily() {
-		const summary = await this.ensureCompletedDailySummaryLoaded()
+	onShareCompletedDaily() {
+		const summary = this.completedDailySummary()
 		if (!summary) {
+			// Safari requires clipboard.write() to run in the original click/touch
+			// gesture. Do not await summary loading here; the button is disabled while
+			// the summary is being prepared, and a failed preload can be retried.
+			void this.ensureCompletedDailySummaryLoaded()
 			return
 		}
 
-		await this.dailyPostPlayService.shareScoreImage(summary.score, summary.puzzleDate)
+		void this.dailyPostPlayService.shareScoreImage(summary.score, summary.puzzleDate)
 	}
 
 	async onReviewCompletedDaily() {
