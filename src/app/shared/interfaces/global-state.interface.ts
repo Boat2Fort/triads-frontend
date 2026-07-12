@@ -39,7 +39,7 @@ export interface GlobalState {
 	triadGroupId: string | number | null
 	unsolvedTriads: SolvedTriad[] | null
 	introShownPerSession: boolean
-	gameMode: 'classic' | 'daily'
+	gameMode: 'classic' | 'daily' | 'standalone-classic'
 	dailyNextPuzzleAt: string | null
 	dailyPuzzleDate: string | null
 	dailyStandaloneResult: boolean

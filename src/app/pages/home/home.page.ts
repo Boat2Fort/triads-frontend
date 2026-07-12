@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnDestroy, OnInit, signal, viewChild } from '@angular/core'
 import { NavigationEnd, Router } from '@angular/router'
 import { IonModal } from '@ionic/angular/standalone'
-import { filter, skip, Subject, takeUntil } from 'rxjs'
+import { filter, Subject, takeUntil } from 'rxjs'
 
 import { BrainWarmingPlayButton } from '../../shared/components/brain-warming-play-button/brain-warming-play-button'
 import { CLASSIC_CAPACITY_MESSAGE } from '../../shared/constants/global.constant'
@@ -101,7 +101,6 @@ export class HomePage implements OnInit, OnDestroy {
 			.pipe(
 				filter((e): e is NavigationEnd => e instanceof NavigationEnd),
 				filter((e) => this.isHomePath(e.urlAfterRedirects)),
-				skip(1),
 				takeUntil(this.destroy$),
 			)
 			.subscribe(() => {

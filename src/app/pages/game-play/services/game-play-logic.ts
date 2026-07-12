@@ -137,7 +137,7 @@ export class GamePlayLogic {
 	}
 
 	private persistDailyGameResult(score: number): void {
-		if (this.store.gameMode() !== 'daily') {
+		if (this.store.gameMode() !== 'daily' && this.store.gameMode() !== 'standalone-classic') {
 			return
 		}
 

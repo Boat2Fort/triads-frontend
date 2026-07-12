@@ -8,11 +8,11 @@ import { UserService } from '../../../shared/services/user.service'
 import { extractClassicExtraQuota } from '../../../shared/utils/classic-extra.util'
 import { GlobalStore } from '../../../state/global.store'
 
-type PlayMode = 'classic' | 'daily'
+type PlayMode = 'classic' | 'daily' | 'standalone-classic'
 
 function readModeFromRoute(route: ActivatedRouteSnapshot): PlayMode {
 	const mode = route.data['mode']
-	return mode === 'daily' ? 'daily' : 'classic'
+	return mode === 'daily' || mode === 'standalone-classic' ? mode : 'classic'
 }
 
 function redirectToHome(router: Router): RedirectCommand {
@@ -38,6 +38,10 @@ export const playGuard: CanActivateFn = (route) => {
 
 	if (!playRouteIntent.consumePending()) {
 		return redirectToHome(router)
+	}
+
+	if (mode === 'standalone-classic') {
+		return true
 	}
 
 	if (mode !== 'daily') {

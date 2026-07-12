@@ -107,6 +107,20 @@ describe('GamePlayLogic', () => {
 		expect(gamePlayApi.postDailyComplete).not.toHaveBeenCalled()
 	})
 
+	it('records standalone Classic results in local stats', () => {
+		mockStore.gameMode.and.returnValue('standalone-classic')
+
+		service.handleGameWon()
+
+		expect(mockStore.setUser).toHaveBeenCalledWith(
+			jasmine.objectContaining({
+				scores: jasmine.objectContaining({ 15: 1 }),
+			}),
+		)
+		expect(userService.setUser).toHaveBeenCalled()
+		expect(gamePlayApi.postDailyComplete).not.toHaveBeenCalled()
+	})
+
 	it('records daily losses in user stats', () => {
 		turnHintService.numberOfAvailableTurns.and.returnValue(0)
 		turnHintService.numberOfAvailableHints.and.returnValue(2)

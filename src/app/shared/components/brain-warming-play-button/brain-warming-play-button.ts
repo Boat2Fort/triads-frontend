@@ -50,7 +50,7 @@ export class BrainWarmingPlayButton implements OnDestroy {
 	 * Optional play mode that the button activates. Setting this updates `GlobalStore.gameMode`
 	 * at click time so the brain-warming prefetch (and downstream guards) see the right mode.
 	 */
-	readonly playMode = input<'classic' | 'daily' | null>(null)
+	readonly playMode = input<'classic' | 'daily' | 'standalone-classic' | null>(null)
 
 	readonly animationRunning = signal(false)
 

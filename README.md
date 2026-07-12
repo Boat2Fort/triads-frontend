@@ -113,7 +113,6 @@ Triads has **no enrollment**—you never need to login or reveal anything about 
 - **[Prettier](https://prettier.io/)** - Code formatting
 - **[Husky](https://typicode.github.io/husky/)** - Git hooks
 - **[Commitlint](https://commitlint.js.org/)** - Commit message linting
-- **[MSW](https://mswjs.io/)** - API mocking for development
 
 ---
 
@@ -159,15 +158,28 @@ Triads has **no enrollment**—you never need to login or reveal anything about 
 
     Navigate to `http://localhost:4200/`
 
+### Standalone Classic web build
+
+The repository also produces the independently hosted, unlimited Classic edition:
+
+```bash
+pnpm start:classic       # local Classic edition at http://localhost:4200
+pnpm build:classic       # production artifact in dist/triads-classic/browser
+```
+
+Deploy the contents of `dist/triads-classic/browser` to `triads-classic.gametrix.org` with SPA fallback to `index.html`. The build uses the shared production API at `https://triads-api.gametrix.org/api`; add `https://triads-classic.gametrix.org` to the backend `CORS_ALLOWED_ORIGINS` environment variable before serving it publicly. DNS, TLS, and web-server provisioning are managed outside this repository.
+
 ### Available Scripts
 
-| Command       | Description               |
-| ------------- | ------------------------- |
-| `pnpm start`  | Start development server  |
-| `pnpm build`  | Build for production      |
-| `pnpm test`   | Run unit tests            |
-| `pnpm lint`   | Lint and fix code         |
-| `pnpm format` | Format code with Prettier |
+| Command              | Description                      |
+| -------------------- | -------------------------------- |
+| `pnpm start`         | Start development server         |
+| `pnpm start:classic` | Start Standalone Classic locally |
+| `pnpm build`         | Build for production             |
+| `pnpm build:classic` | Build Standalone Classic         |
+| `pnpm test`          | Run unit tests                   |
+| `pnpm lint`          | Lint and fix code                |
+| `pnpm format`        | Format code with Prettier        |
 
 ---
 

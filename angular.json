@@ -55,6 +55,27 @@
 							],
 							"outputHashing": "all"
 						},
+						"classic": {
+							"fileReplacements": [
+								{
+									"replace": "src/environments/environment.ts",
+									"with": "src/environments/environment.classic.prod.ts"
+								}
+							],
+							"outputPath": "dist/triads-classic",
+							"outputHashing": "all"
+						},
+						"classic-development": {
+							"fileReplacements": [
+								{
+									"replace": "src/environments/environment.ts",
+									"with": "src/environments/environment.classic.ts"
+								}
+							],
+							"optimization": false,
+							"extractLicenses": false,
+							"sourceMap": true
+						},
 						"development": {
 							"optimization": false,
 							"extractLicenses": false,
@@ -74,6 +95,12 @@
 						},
 						"development": {
 							"buildTarget": "triads:build:development"
+						},
+						"classic": {
+							"buildTarget": "triads:build:classic-development"
+						},
+						"classic-production": {
+							"buildTarget": "triads:build:classic"
 						}
 					},
 					"defaultConfiguration": "development"

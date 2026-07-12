@@ -35,7 +35,9 @@ export class GameResultDialog {
 
 	readonly isDailyMode = computed(() => this.store.gameMode() === 'daily')
 
-	readonly isFinalClassicExtra = computed(() => !this.isDailyMode() && this.store.isFinalClassicExtraSession())
+	readonly isStandaloneClassicMode = computed(() => this.store.gameMode() === 'standalone-classic')
+
+	readonly isFinalClassicExtra = computed(() => this.store.gameMode() === 'classic' && this.store.isFinalClassicExtraSession())
 
 	readonly classicCapacityMessage = CLASSIC_CAPACITY_MESSAGE
 
@@ -45,7 +47,7 @@ export class GameResultDialog {
 
 	readonly canPlayMore = computed(() => this.classicExtrasRemaining() > 0)
 
-	readonly canContinueClassic = computed(() => this.classicExtrasRemaining() > 0 && !this.isFinalClassicExtra())
+	readonly canContinueClassic = computed(() => this.isStandaloneClassicMode() || (this.classicExtrasRemaining() > 0 && !this.isFinalClassicExtra()))
 
 	readonly classicPlayAgainLabel = computed(() => {
 		const remaining = this.classicExtrasRemaining()

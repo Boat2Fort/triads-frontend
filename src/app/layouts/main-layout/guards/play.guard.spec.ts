@@ -11,7 +11,7 @@ import { playGuard } from './play.guard'
 describe('playGuard', () => {
 	const mockUser = { username: 'test', scores: {} }
 
-	const runGuard = async (mode: 'classic' | 'daily', options?: { canPlayClassic?: boolean; hasCompletedDaily?: boolean }) => {
+	const runGuard = async (mode: 'classic' | 'daily' | 'standalone-classic', options?: { canPlayClassic?: boolean; hasCompletedDaily?: boolean }) => {
 		const route = {
 			data: { mode },
 		} as unknown as ActivatedRouteSnapshot
@@ -63,6 +63,13 @@ describe('playGuard', () => {
 		const { result } = await runGuard('classic', { canPlayClassic: true })
 
 		expect(result).toBeTrue()
+	})
+
+	it('allows standalone Classic without checking the Daily quota', async () => {
+		const { result, gamePlayApi } = await runGuard('standalone-classic')
+
+		expect(result).toBeTrue()
+		expect(gamePlayApi.getDailyTodayInfo).not.toHaveBeenCalled()
 	})
 
 	it('redirects daily play when already completed', async () => {

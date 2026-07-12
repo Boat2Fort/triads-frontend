@@ -114,8 +114,10 @@
 	</ion-modal>
 }
 
-<ion-modal [isOpen]="playMoreDialogOpen()" (didDismiss)="closePlayMoreDialog()">
-	<ng-template>
-		<app-play-more-dialog [remaining]="classicExtrasRemaining()" (whenClosed)="closePlayMoreDialog()" />
-	</ng-template>
-</ion-modal>
+@if (!isStandaloneClassicMode()) {
+	<ion-modal [isOpen]="playMoreDialogOpen()" (didDismiss)="closePlayMoreDialog()">
+		<ng-template>
+			<app-play-more-dialog [remaining]="classicExtrasRemaining()" (whenClosed)="closePlayMoreDialog()" />
+		</ng-template>
+	</ion-modal>
+}

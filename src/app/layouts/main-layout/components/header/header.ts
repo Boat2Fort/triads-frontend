@@ -60,7 +60,7 @@ export class Header implements OnInit, OnDestroy {
 	// Check if on gameplay page (classic or daily)
 	isGameplayPage = computed(() => {
 		const url = this.currentUrl()
-		return url === '/classic' || url === '/daily'
+		return url === '/classic' || url === '/daily' || url === '/play'
 	})
 
 	// Difficulty selector is irrelevant during daily gameplay (puzzle is fixed)

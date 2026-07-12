@@ -4,7 +4,9 @@
 	"scripts": {
 		"ng": "ng",
 		"start": "ng serve --host 0.0.0.0",
+		"start:classic": "ng serve --host 0.0.0.0 --configuration classic",
 		"build": "ng build",
+		"build:classic": "ng build --configuration classic",
 		"watch": "ng build --watch --configuration development",
 		"test": "ng test",
 		"lint": "ng lint --fix",

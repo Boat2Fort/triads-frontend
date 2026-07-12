@@ -40,7 +40,9 @@ export class GameCuePrefetchService {
 		}
 
 		const difficulty = this.difficultyService.getDifficulty()
-		const stream = this.gamePlayApi.getCues(difficulty).pipe(shareReplay({ bufferSize: 1, refCount: false }))
+		const stream = (
+			this.store.gameMode() === 'standalone-classic' ? this.gamePlayApi.getStandaloneClassicCues(difficulty) : this.gamePlayApi.getCues(difficulty)
+		).pipe(shareReplay({ bufferSize: 1, refCount: false }))
 		this.classicPrefetch = { difficulty, stream }
 		this.prefetchSubscription = stream.subscribe()
 	}

@@ -88,6 +88,15 @@ export class GamePlayApi {
 		>('triads/cues', { params })
 	}
 
+	getStandaloneClassicCues(difficulty: Difficulty) {
+		const params = new HttpParams().set('difficulty', difficulty)
+		return this.httpClient.get<{
+			triadGroupId: string | number | null
+			cues: string[] | null
+			message?: string
+		}>('triads/standalone-classic/cues', { params })
+	}
+
 	checkTriad(cues: string[]) {
 		return this.httpClient.get<boolean>('triads/check-triad', { params: { cues } })
 	}

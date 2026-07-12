@@ -1,4 +1,3 @@
-import { isDevMode } from '@angular/core'
 import { bootstrapApplication } from '@angular/platform-browser'
 
 import { App } from './app/app'
@@ -7,15 +6,6 @@ import { AssetPreloadService } from './app/shared/services/asset-preload.service
 import { environment } from './environments/environment'
 
 const SPLASH_FADE_OUT_MS = 400
-
-async function prepareApp() {
-	if (isDevMode() && !environment.production) {
-		const { worker } = await import('./mocks/browser')
-		return worker.start()
-	}
-
-	return Promise.resolve()
-}
 
 function updateSplashProgress(percent: number): void {
 	const bar = document.getElementById('app-splash-bar')
@@ -40,6 +30,8 @@ function hideSplash(): void {
 
 const assetPreloadService = new AssetPreloadService()
 
+document.title = environment.appEdition === 'classic' ? 'Triads Classic' : 'Triads'
+
 const assetsReady = assetPreloadService.preloadAll({
 	onProgress: ({ loaded, total }) => {
 		if (total === 0) {
@@ -51,7 +43,7 @@ const assetsReady = assetPreloadService.preloadAll({
 	timeoutMs: 15_000,
 })
 
-Promise.all([assetsReady, prepareApp()])
+assetsReady
 	.then(() => bootstrapApplication(App, appConfig))
 	.catch((err) => console.error(err))
 	.finally(() => {

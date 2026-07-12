@@ -339,7 +339,7 @@ export const GlobalStore = signalStore(
 		setIntroShownPerSession: (introShownPerSession: boolean) => {
 			patchState(store, (state) => ({ ...state, introShownPerSession }))
 		},
-		setGameMode: (gameMode: 'classic' | 'daily') => {
+		setGameMode: (gameMode: 'classic' | 'daily' | 'standalone-classic') => {
 			patchState(store, (state) => ({ ...state, gameMode }))
 		},
 		setDailyNextPuzzleAt: (dailyNextPuzzleAt: string | null) => {

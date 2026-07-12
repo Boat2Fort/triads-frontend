@@ -251,9 +251,11 @@ export class GamePlay implements OnInit, OnDestroy {
 		// (ADR-0002). Returning to a backgrounded board after the Eastern day has changed routes home.
 		// Intentionally no onTimerRollover: an actively-focused player must never be yanked off their
 		// board the instant midnight passes; the new day is picked up only when they return to a stale tab.
-		this.stopEasternDayWatcher = this.dailyRolloverService.startEasternDayWatcher({
-			onReentryRollover: () => this.handlePlayReentryRollover(),
-		})
+		if (this.store.gameMode() !== 'standalone-classic') {
+			this.stopEasternDayWatcher = this.dailyRolloverService.startEasternDayWatcher({
+				onReentryRollover: () => this.handlePlayReentryRollover(),
+			})
+		}
 		if (this.store.gameMode() === 'daily') {
 			// iOS Safari can kill a backgrounded tab without firing ngOnDestroy; flush the debounced
 			// progress save the moment the page becomes hidden so the server captures the latest
@@ -397,12 +399,14 @@ export class GamePlay implements OnInit, OnDestroy {
 		this.store.setUnsolvedTriads(null)
 		this.store.resetGameState()
 		const difficulty = this.difficultyService.getDifficulty()
-		const classicCues$ = this.gameCuePrefetch.consumeClassicCues(difficulty) ?? this.gamePlayApi.getCues(difficulty)
+		const classicCues$ =
+			this.gameCuePrefetch.consumeClassicCues(difficulty) ??
+			(this.store.gameMode() === 'standalone-classic' ? this.gamePlayApi.getStandaloneClassicCues(difficulty) : this.gamePlayApi.getCues(difficulty))
 		this.subscriptions$.add(
 			classicCues$.subscribe({
 				next: (response) => {
 					this.loadEasternDateKey = this.dailyRolloverService.getEasternDateKey()
-					const quota = extractClassicExtraQuota(response)
+					const quota = this.store.gameMode() === 'classic' ? extractClassicExtraQuota(response) : null
 					if (quota) {
 						this.store.setClassicExtraQuota(quota)
 						this.store.setFinalClassicExtraSession(quota.classicExtrasRemaining === 0)
@@ -431,7 +435,7 @@ export class GamePlay implements OnInit, OnDestroy {
 					this.loadEasternDateKey = this.dailyRolloverService.getEasternDateKey()
 					const apiError = isApiError(error) ? error : parseApiError(error)
 					apiError.markHandled()
-					const quota = extractClassicExtraQuota(apiError.originalResponse?.error)
+					const quota = this.store.gameMode() === 'classic' ? extractClassicExtraQuota(apiError.originalResponse?.error) : null
 					if (quota) {
 						this.store.setClassicExtraQuota(quota)
 						this.store.setFinalClassicExtraSession(quota.classicExtrasRemaining === 0)
@@ -546,7 +550,7 @@ export class GamePlay implements OnInit, OnDestroy {
 	}
 
 	generateGameResultMessage() {
-		if (this.store.gameMode() !== 'daily' && this.store.isFinalClassicExtraSession()) {
+		if (this.store.gameMode() === 'classic' && this.store.isFinalClassicExtraSession()) {
 			return ''
 		}
 		const gameScore = this.store.gameScore()

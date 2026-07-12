@@ -36,6 +36,10 @@ _Avoid_: Day timer, midnight watcher
 A Classic game a player may start _after_ finishing today's Daily, capped at a small daily allowance and reset by the Daily Rollover. Locked until today's Daily is completed.
 _Avoid_: Bonus game, extra game, play more
 
+**Standalone Classic**:
+The independently hosted Classic edition, available without completing the Daily and without a daily play quota. Its player profile and score history are separate because the browser origin is separate.
+_Avoid_: Classic Extra, unlimited extra
+
 **Play-More Prompt**:
 The post-Daily invitation to start another Classic Extra, showing how many of the day's allowance remain. Appears both on the home screen and after a Classic Extra ends.
 _Avoid_: Play again screen, second-game page
