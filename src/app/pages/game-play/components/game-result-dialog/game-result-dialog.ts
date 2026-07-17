@@ -228,8 +228,11 @@ export class GameResultDialog {
 		this.playMoreDialogOpen.set(false)
 	}
 
-	async shareGameResult() {
-		await this.dailyPostPlayService.shareScoreImage(this.store.gameScore(), this.store.dailyPuzzleDate())
+	shareGameResult() {
+		// Keep the share request in the original click gesture. Safari can reject
+		// clipboard writes after an async boundary, so this mirrors the reliable
+		// completed-Daily share action on the home page.
+		void this.dailyPostPlayService.shareScoreImage(this.store.gameScore(), this.store.dailyPuzzleDate())
 	}
 
 	async openDailyReview() {

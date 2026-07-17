@@ -28,6 +28,10 @@ _Avoid_: Score card, result screenshot
 The tear-off-calendar element overlaid on the Score Share Image showing the puzzle's date (month, day, year). It is anchored to the puzzle's own date — not the moment of sharing — so a score always names the puzzle it came from.
 _Avoid_: Date stamp, calendar icon
 
+**Solution Reveal**:
+The cards shown after a lost game that disclose the unsolved triads and their matching phrases.
+_Avoid_: Answer cards, solution boxes
+
 **Eastern Day Watcher**:
 The shared service mechanism that detects rollover. It exposes two distinct signals: a live midnight-timer rollover and a re-entry (focus/visibility) rollover, so consumers can react to each independently.
 _Avoid_: Day timer, midnight watcher

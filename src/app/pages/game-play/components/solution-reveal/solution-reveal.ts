@@ -42,7 +42,7 @@ export class SolutionReveal {
 			this.dismissed.set(false)
 		})
 
-		const onPointerDown = (event: Event) => {
+		const onDocumentClick = (event: Event) => {
 			const triads = this.unsolvedTriads()
 			if (triads === null || triads.length === 0 || this.dismissed()) {
 				return
@@ -55,11 +55,12 @@ export class SolutionReveal {
 			if (target instanceof Node && root.contains(target)) {
 				return
 			}
-			// Defer dismissal so the current click target still receives its action.
-			queueMicrotask(() => this.dismissed.set(true))
+			// A bubbling click runs after the clicked control's handler, so one tap can
+			// both perform the result action and dismiss the Solution Reveal.
+			this.dismissed.set(true)
 		}
 
-		this.document.addEventListener('pointerdown', onPointerDown, true)
-		this.destroyRef.onDestroy(() => this.document.removeEventListener('pointerdown', onPointerDown, true))
+		this.document.addEventListener('click', onDocumentClick)
+		this.destroyRef.onDestroy(() => this.document.removeEventListener('click', onDocumentClick))
 	}
 }

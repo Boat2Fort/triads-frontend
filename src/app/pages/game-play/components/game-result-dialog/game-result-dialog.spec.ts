@@ -148,8 +148,8 @@ describe('GameResultDialog', () => {
 		expect(renderedImage.getAttribute('alt')).toContain('score 10')
 	})
 
-	it('shares the current score through the shared post-play service', async () => {
-		await component.shareGameResult()
+	it('shares the current score synchronously to preserve Safari user activation', () => {
+		component.shareGameResult()
 
 		expect(dailyPostPlayService.shareScoreImage).toHaveBeenCalledWith(10, '2026-04-20')
 	})
