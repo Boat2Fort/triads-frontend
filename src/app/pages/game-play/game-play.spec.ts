@@ -163,6 +163,7 @@ describe('GamePlay', () => {
 
 		expect(store.solvedTriads().length).toBe(2)
 		expect(store.solvedTriads().map((triad) => triad.keyword)).toEqual(['HAND', 'LINE'])
+		expect(store.dailyPuzzleDate()).toBe(TODAY)
 		expect(store.gamePlayState()).toBe(GamePlayState.PLAYING)
 	})
 

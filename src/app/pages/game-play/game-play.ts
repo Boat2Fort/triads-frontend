@@ -670,6 +670,9 @@ export class GamePlay implements OnInit, OnDestroy {
 
 	private applyDailySession(session: DailyGameSessionSnapshot) {
 		this.store.resetGameState()
+		// resetGameState clears all puzzle metadata, so restore the date from the
+		// persisted/server snapshot before the result dialog needs it for sharing.
+		this.store.setDailyPuzzleDate(session.puzzleDate)
 		this.store.setDailyNextPuzzleAt(session.dailyNextPuzzleAt)
 		this.store.setCues(session.cues ?? [])
 		this.store.setTriadGroupId(session.triadGroupId)
