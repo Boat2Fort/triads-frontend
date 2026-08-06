@@ -1,6 +1,6 @@
 import { HttpClientTestingModule } from '@angular/common/http/testing'
 import { ComponentFixture, TestBed } from '@angular/core/testing'
-import { of, throwError } from 'rxjs'
+import { of, Subject, throwError } from 'rxjs'
 
 import { Difficulty } from '../../shared/enums/difficulty.enum'
 import { DailyScheduleAdminApi } from '../../shared/services/daily-schedule-admin-api'
@@ -42,12 +42,14 @@ describe('TriadManagementPage', () => {
 			'updateTriadGroup',
 			'deleteTriadGroup',
 			'toggleTriadGroupStatus',
+			'getPublicTriadGroupsExport',
 		])
 		dailyScheduleApi = jasmine.createSpyObj<DailyScheduleAdminApi>('DailyScheduleAdminApi', ['getSchedules', 'createSchedule', 'deleteSchedule'])
 		snackbar = jasmine.createSpyObj<SnackbarService>('SnackbarService', ['showSnackbar'])
 
 		api.getTriadGroups.and.returnValue(of([]))
 		api.getTriadGroupStats.and.returnValue(of({ totalActive: 0, byDifficulty: { EASY: 0, MEDIUM: 0, HARD: 0 } }))
+		api.getPublicTriadGroupsExport.and.returnValue(of(new Blob()))
 		dailyScheduleApi.getSchedules.and.returnValue(of([]))
 
 		await TestBed.configureTestingModule({
@@ -135,6 +137,48 @@ describe('TriadManagementPage', () => {
 		component.loadTriadGroupStats()
 
 		expect(api.getTriadGroupStats).toHaveBeenCalledWith()
+	})
+
+	it('downloads the complete public inventory as an Addis Ababa-dated JSON file', () => {
+		const inventory = new Blob(['[{"id":1}]'], { type: 'application/json' })
+		const objectUrl = 'blob:triad-groups-export'
+		api.getPublicTriadGroupsExport.and.returnValue(of(inventory))
+		spyOn(URL, 'createObjectURL').and.returnValue(objectUrl)
+		spyOn(URL, 'revokeObjectURL')
+		jasmine.clock().install()
+		jasmine.clock().mockDate(new Date('2026-08-06T00:30:00.000Z'))
+		const downloadClick = spyOn(HTMLAnchorElement.prototype, 'click').and.callFake(function (this: HTMLAnchorElement) {
+			expect(this.href).toBe(objectUrl)
+			expect(this.download).toBe('triad-groups-2026-08-06.json')
+		})
+
+		try {
+			component.onDownloadPublicTriadGroups()
+		} finally {
+			jasmine.clock().uninstall()
+		}
+
+		expect(api.getPublicTriadGroupsExport).toHaveBeenCalledTimes(1)
+		expect(URL.createObjectURL).toHaveBeenCalledWith(inventory)
+		expect(downloadClick).toHaveBeenCalledTimes(1)
+		expect(URL.revokeObjectURL).toHaveBeenCalledWith(objectUrl)
+		expect(component.isDownloadingPublicTriadGroups()).toBeFalse()
+		expect(snackbar.showSnackbar).toHaveBeenCalledWith('Public triad-group inventory downloaded')
+	})
+
+	it('prevents duplicate inventory exports while one is in progress and recovers after an error', () => {
+		const response = new Subject<Blob>()
+		api.getPublicTriadGroupsExport.and.returnValue(response)
+
+		component.onDownloadPublicTriadGroups()
+		component.onDownloadPublicTriadGroups()
+
+		expect(api.getPublicTriadGroupsExport).toHaveBeenCalledTimes(1)
+		expect(component.isDownloadingPublicTriadGroups()).toBeTrue()
+
+		response.error(new Error('Export failed'))
+
+		expect(component.isDownloadingPublicTriadGroups()).toBeFalse()
 	})
 
 	it('loads all daily schedule pages for assigned schedule hints', () => {

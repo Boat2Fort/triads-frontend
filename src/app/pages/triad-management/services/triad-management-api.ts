@@ -29,6 +29,10 @@ export class TriadManagementApi {
 		return this.httpClient.get<TriadGroupStats>('triads/groups/stats')
 	}
 
+	getPublicTriadGroupsExport(): Observable<Blob> {
+		return this.httpClient.get('public/triad-groups', { responseType: 'blob' })
+	}
+
 	createTriadGroup(data: TriadGroupFormData): Observable<TriadGroupResponse> {
 		return this.httpClient.post<TriadGroupResponse>('triads/groups', data)
 	}

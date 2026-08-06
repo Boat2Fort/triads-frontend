@@ -87,6 +87,20 @@ describe('TriadManagementApi', () => {
 		req.flush(mockResponse)
 	})
 
+	it('should fetch the complete public triad-group inventory as a blob', () => {
+		const mockResponse = new Blob(['[{"id":1,"difficulty":"EASY","triads":[]}]'], { type: 'application/json' })
+
+		service.getPublicTriadGroupsExport().subscribe((response) => {
+			expect(response).toBe(mockResponse)
+		})
+
+		const req = httpMock.expectOne('public/triad-groups')
+		expect(req.request.method).toBe('GET')
+		expect(req.request.responseType).toBe('blob')
+		expect(req.request.params.keys()).toEqual([])
+		req.flush(mockResponse)
+	})
+
 	it('should create a triad group', () => {
 		const mockData: TriadGroupFormData = {
 			difficulty: 'EASY',

@@ -50,6 +50,8 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 
 	isLoading = signal<boolean>(false)
 
+	isDownloadingPublicTriadGroups = signal(false)
+
 	hasMore = signal<boolean>(true)
 
 	searchQuery = signal<string>('')
@@ -234,6 +236,30 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 		this.addDialogApiError.set(null)
 		this.addDialogSubmitting.set(false)
 		this.showAddDialog.set(true)
+	}
+
+	onDownloadPublicTriadGroups() {
+		if (this.isDownloadingPublicTriadGroups()) {
+			return
+		}
+
+		this.isDownloadingPublicTriadGroups.set(true)
+		this.api.getPublicTriadGroupsExport().subscribe({
+			next: (exportBlob) => {
+				const objectUrl = URL.createObjectURL(exportBlob)
+				const downloadLink = document.createElement('a')
+				downloadLink.href = objectUrl
+				downloadLink.download = `triad-groups-${this.getAddisAbabaDateYmd()}.json`
+				downloadLink.click()
+				URL.revokeObjectURL(objectUrl)
+				this.isDownloadingPublicTriadGroups.set(false)
+				this.snackbar.showSnackbar('Public triad-group inventory downloaded')
+			},
+			error: () => {
+				this.isDownloadingPublicTriadGroups.set(false)
+				// Error message shown by HTTP interceptor
+			},
+		})
 	}
 
 	onAddDialogCreated(data: TriadGroupFormData) {
@@ -511,6 +537,18 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 		const [year, month, day] = value.split('-').map(Number)
 		const date = new Date(Date.UTC(year, month - 1, day + days))
 		return date.toISOString().slice(0, 10)
+	}
+
+	private getAddisAbabaDateYmd(): string {
+		const parts = new Intl.DateTimeFormat('en-US', {
+			timeZone: 'Africa/Addis_Ababa',
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit',
+		}).formatToParts(new Date())
+		const readPart = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ''
+
+		return `${readPart('year')}-${readPart('month')}-${readPart('day')}`
 	}
 
 	private toApiError(error: unknown): ApiError {
