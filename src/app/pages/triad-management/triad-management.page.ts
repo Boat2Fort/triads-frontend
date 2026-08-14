@@ -28,6 +28,23 @@ import { TriadDailyScheduleHint, TriadGroupCard } from './components/triad-group
 import { TriadGroup, TriadGroupFormData, TriadGroupStats } from './interfaces/triad-group.interface'
 import { TriadManagementApi } from './services/triad-management-api'
 
+interface PublicTriadGroupExport {
+	id: number
+	difficulty: Difficulty
+	triads: unknown[]
+}
+
+interface CategorizedPublicTriadGroupExport {
+	id: number
+	triads: unknown[]
+}
+
+interface CategorizedPublicTriadGroupsExport {
+	easy: CategorizedPublicTriadGroupExport[]
+	firm: CategorizedPublicTriadGroupExport[]
+	hard: CategorizedPublicTriadGroupExport[]
+}
+
 @Component({
 	selector: 'app-triad-management',
 	standalone: true,
@@ -246,14 +263,7 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 		this.isDownloadingPublicTriadGroups.set(true)
 		this.api.getPublicTriadGroupsExport().subscribe({
 			next: (exportBlob) => {
-				const objectUrl = URL.createObjectURL(exportBlob)
-				const downloadLink = document.createElement('a')
-				downloadLink.href = objectUrl
-				downloadLink.download = `triad-groups-${this.getAddisAbabaDateYmd()}.json`
-				downloadLink.click()
-				URL.revokeObjectURL(objectUrl)
-				this.isDownloadingPublicTriadGroups.set(false)
-				this.snackbar.showSnackbar('Public triad-group inventory downloaded')
+				void this.downloadPublicTriadGroupFiles(exportBlob)
 			},
 			error: () => {
 				this.isDownloadingPublicTriadGroups.set(false)
@@ -537,6 +547,57 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 		const [year, month, day] = value.split('-').map(Number)
 		const date = new Date(Date.UTC(year, month - 1, day + days))
 		return date.toISOString().slice(0, 10)
+	}
+
+	private async downloadPublicTriadGroupFiles(exportBlob: Blob): Promise<void> {
+		try {
+			const triadGroups = JSON.parse(await exportBlob.text()) as PublicTriadGroupExport[]
+			const dateYmd = this.getAddisAbabaDateYmd()
+			const categorizedBlob = new Blob([JSON.stringify(this.categorizePublicTriadGroups(triadGroups), null, 2)], {
+				type: 'application/json',
+			})
+
+			this.downloadBlob(exportBlob, `triad-groups-${dateYmd}.json`)
+			this.downloadBlob(categorizedBlob, `triad-cues-by-difficulty-${dateYmd}.json`)
+			this.snackbar.showSnackbar('Public triad-group inventory and categorized cues downloaded')
+		} catch {
+			this.snackbar.showSnackbar('Unable to prepare triad-group downloads')
+		} finally {
+			this.isDownloadingPublicTriadGroups.set(false)
+		}
+	}
+
+	private categorizePublicTriadGroups(triadGroups: PublicTriadGroupExport[]): CategorizedPublicTriadGroupsExport {
+		const categorizedGroups: CategorizedPublicTriadGroupsExport = {
+			easy: [],
+			firm: [],
+			hard: [],
+		}
+
+		for (const { difficulty, ...group } of triadGroups) {
+			switch (difficulty) {
+				case Difficulty.EASY:
+					categorizedGroups.easy.push(group)
+					break
+				case Difficulty.MEDIUM:
+					categorizedGroups.firm.push(group)
+					break
+				case Difficulty.HARD:
+					categorizedGroups.hard.push(group)
+					break
+			}
+		}
+
+		return categorizedGroups
+	}
+
+	private downloadBlob(blob: Blob, filename: string): void {
+		const objectUrl = URL.createObjectURL(blob)
+		const downloadLink = document.createElement('a')
+		downloadLink.href = objectUrl
+		downloadLink.download = filename
+		downloadLink.click()
+		URL.revokeObjectURL(objectUrl)
 	}
 
 	private getAddisAbabaDateYmd(): string {

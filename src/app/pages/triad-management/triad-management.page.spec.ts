@@ -139,31 +139,55 @@ describe('TriadManagementPage', () => {
 		expect(api.getTriadGroupStats).toHaveBeenCalledWith()
 	})
 
-	it('downloads the complete public inventory as an Addis Ababa-dated JSON file', () => {
-		const inventory = new Blob(['[{"id":1}]'], { type: 'application/json' })
-		const objectUrl = 'blob:triad-groups-export'
+	it('downloads the complete public inventory and categorized cues as Addis Ababa-dated JSON files', async () => {
+		const inventoryText = Promise.resolve(
+			JSON.stringify([
+				{ id: 1, difficulty: 'EASY', triads: [{ position: 1, cues: ['A', 'B', 'C'] }] },
+				{ id: 2, difficulty: 'MEDIUM', triads: [{ position: 1, cues: ['D', 'E', 'F'] }] },
+				{ id: 3, difficulty: 'HARD', triads: [{ position: 1, cues: ['G', 'H', 'I'] }] },
+			]),
+		)
+		const inventory = { text: () => inventoryText } as unknown as Blob
+		const rawInventoryObjectUrl = 'blob:triad-groups-export'
+		const categorizedCuesObjectUrl = 'blob:triad-cues-export'
 		api.getPublicTriadGroupsExport.and.returnValue(of(inventory))
-		spyOn(URL, 'createObjectURL').and.returnValue(objectUrl)
+		spyOn(URL, 'createObjectURL').and.returnValues(rawInventoryObjectUrl, categorizedCuesObjectUrl)
 		spyOn(URL, 'revokeObjectURL')
 		jasmine.clock().install()
 		jasmine.clock().mockDate(new Date('2026-08-06T00:30:00.000Z'))
+		const downloadedFiles: string[] = []
 		const downloadClick = spyOn(HTMLAnchorElement.prototype, 'click').and.callFake(function (this: HTMLAnchorElement) {
-			expect(this.href).toBe(objectUrl)
-			expect(this.download).toBe('triad-groups-2026-08-06.json')
+			downloadedFiles.push(this.download)
 		})
 
 		try {
 			component.onDownloadPublicTriadGroups()
+			await inventoryText
 		} finally {
 			jasmine.clock().uninstall()
 		}
 
 		expect(api.getPublicTriadGroupsExport).toHaveBeenCalledTimes(1)
 		expect(URL.createObjectURL).toHaveBeenCalledWith(inventory)
-		expect(downloadClick).toHaveBeenCalledTimes(1)
-		expect(URL.revokeObjectURL).toHaveBeenCalledWith(objectUrl)
+		expect(downloadClick).toHaveBeenCalledTimes(2)
+		expect(downloadedFiles).toEqual(['triad-groups-2026-08-06.json', 'triad-cues-by-difficulty-2026-08-06.json'])
+		expect(URL.revokeObjectURL).toHaveBeenCalledWith(rawInventoryObjectUrl)
+		expect(URL.revokeObjectURL).toHaveBeenCalledWith(categorizedCuesObjectUrl)
+
+		const categorizedBlob = (URL.createObjectURL as jasmine.Spy).calls.allArgs()[1][0] as Blob
+		await expectAsync(categorizedBlob.text()).toBeResolvedTo(
+			JSON.stringify(
+				{
+					easy: [{ id: 1, triads: [{ position: 1, cues: ['A', 'B', 'C'] }] }],
+					firm: [{ id: 2, triads: [{ position: 1, cues: ['D', 'E', 'F'] }] }],
+					hard: [{ id: 3, triads: [{ position: 1, cues: ['G', 'H', 'I'] }] }],
+				},
+				null,
+				2,
+			),
+		)
 		expect(component.isDownloadingPublicTriadGroups()).toBeFalse()
-		expect(snackbar.showSnackbar).toHaveBeenCalledWith('Public triad-group inventory downloaded')
+		expect(snackbar.showSnackbar).toHaveBeenCalledWith('Public triad-group inventory and categorized cues downloaded')
 	})
 
 	it('prevents duplicate inventory exports while one is in progress and recovers after an error', () => {
