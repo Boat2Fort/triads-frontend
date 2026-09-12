@@ -163,6 +163,7 @@ describe('TriadManagementPage', () => {
 		try {
 			component.onDownloadPublicTriadGroups()
 			await inventoryText
+			jasmine.clock().tick(0)
 		} finally {
 			jasmine.clock().uninstall()
 		}

@@ -617,8 +617,10 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 		const downloadLink = document.createElement('a')
 		downloadLink.href = objectUrl
 		downloadLink.download = filename
+		document.body.append(downloadLink)
 		downloadLink.click()
-		URL.revokeObjectURL(objectUrl)
+		downloadLink.remove()
+		window.setTimeout(() => URL.revokeObjectURL(objectUrl))
 	}
 
 	private getAddisAbabaDateYmd(): string {

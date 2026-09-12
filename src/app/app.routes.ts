@@ -7,7 +7,7 @@ import { MainLayout } from './layouts/main-layout/main-layout'
 import { GamePlay } from './pages/game-play/game-play'
 import { TriadManagementPage } from './pages/triad-management/triad-management.page'
 
-const mainRoutes: Routes = [
+export const mainRoutes: Routes = [
 	{
 		path: '',
 		component: MainLayout,
@@ -39,7 +39,7 @@ const mainRoutes: Routes = [
 	},
 ]
 
-const standaloneClassicRoutes: Routes = [
+export const standaloneClassicRoutes: Routes = [
 	{
 		path: '',
 		component: MainLayout,
