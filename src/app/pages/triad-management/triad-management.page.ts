@@ -4,6 +4,7 @@ import {
 	Component,
 	computed,
 	ElementRef,
+	HostListener,
 	inject,
 	Injector,
 	OnDestroy,
@@ -114,13 +115,14 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 
 	readonly firstAvailablePuzzleDateYmd = computed(() => {
 		const today = minDailySchedulePuzzleDateYmd()
-		const latestScheduleDate = this.dailySchedules().reduce((latest, row) => (row.puzzleDate.localeCompare(latest) > 0 ? row.puzzleDate : latest), '')
-		if (!latestScheduleDate) {
-			return today
+		const scheduledDates = new Set(this.dailySchedules().map((row) => row.puzzleDate))
+		let firstOpenDate = today
+
+		while (scheduledDates.has(firstOpenDate)) {
+			firstOpenDate = this.addDaysToYmd(firstOpenDate, 1)
 		}
 
-		const nextDate = this.addDaysToYmd(latestScheduleDate, 1)
-		return nextDate.localeCompare(today) < 0 ? today : nextDate
+		return firstOpenDate
 	})
 
 	private offset = 0
@@ -190,13 +192,29 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 			return
 		}
 
+		this.isJumpingToScheduleBoundary.set(true)
+		this.loadDailySchedules(
+			() => this.startScheduleBoundaryJump(),
+			() => this.isJumpingToScheduleBoundary.set(false),
+		)
+	}
+
+	@HostListener('window:focus')
+	onWindowFocus() {
+		if (this.isLoadingDailySchedules() || this.isJumpingToScheduleBoundary()) {
+			return
+		}
+
+		this.loadDailySchedules()
+	}
+
+	private startScheduleBoundaryJump() {
 		this.searchQuery.set('')
 		this.searchSubject.next('')
 		this.selectedDifficulty.set(null)
 		this.offset = 0
 		this.triadGroups.set([])
 		this.hasMore.set(true)
-		this.isJumpingToScheduleBoundary.set(true)
 		this.loadUntilScheduleBoundary(0, [])
 	}
 
@@ -364,13 +382,13 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 		this.deleteTargetId.set(null)
 	}
 
-	loadDailySchedules() {
+	loadDailySchedules(onLoaded?: () => void, onError?: () => void) {
 		const loadVersion = ++this.dailySchedulesLoadVersion
 		this.isLoadingDailySchedules.set(true)
-		this.loadDailySchedulePage(0, [], loadVersion)
+		this.loadDailySchedulePage(0, [], loadVersion, onLoaded, onError)
 	}
 
-	private loadDailySchedulePage(offset: number, accumulated: DailyScheduleRow[], loadVersion: number) {
+	private loadDailySchedulePage(offset: number, accumulated: DailyScheduleRow[], loadVersion: number, onLoaded?: () => void, onError?: () => void) {
 		this.dailyScheduleApi.getSchedules(offset, this.dailySchedulePageLimit).subscribe({
 			next: (rows) => {
 				if (loadVersion !== this.dailySchedulesLoadVersion) {
@@ -379,16 +397,18 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 
 				const schedules = [...accumulated, ...rows]
 				if (rows.length >= this.dailySchedulePageLimit) {
-					this.loadDailySchedulePage(offset + this.dailySchedulePageLimit, schedules, loadVersion)
+					this.loadDailySchedulePage(offset + this.dailySchedulePageLimit, schedules, loadVersion, onLoaded, onError)
 					return
 				}
 
 				this.dailySchedules.set(schedules)
 				this.isLoadingDailySchedules.set(false)
+				onLoaded?.()
 			},
 			error: () => {
 				if (loadVersion === this.dailySchedulesLoadVersion) {
 					this.isLoadingDailySchedules.set(false)
+					onError?.()
 				}
 				// Error message shown by HTTP interceptor
 			},
@@ -434,7 +454,8 @@ export class TriadManagementPage implements OnInit, OnDestroy {
 				this.loadDailySchedules()
 			},
 			error: () => {
-				// Error message shown by HTTP interceptor
+				// Refresh stale schedule hints after a server-side conflict or other rejected change.
+				this.loadDailySchedules()
 			},
 		})
 	}

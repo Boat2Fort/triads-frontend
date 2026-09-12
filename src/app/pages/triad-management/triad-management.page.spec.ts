@@ -233,18 +233,41 @@ describe('TriadManagementPage', () => {
 		expect(component.scheduleHintForGroup(42)).toEqual({ dateYmd: '2026-07-12', rowId: 9 })
 	})
 
-	it('shows the first available puzzle date after the latest assigned puzzle date', () => {
-		component.dailySchedules.set([
-			{ id: 1, puzzleDate: '2026-08-10', triadGroupId: 10 },
-			{ id: 2, puzzleDate: '2026-08-31', triadGroupId: 20 },
-			{ id: 3, puzzleDate: '2026-08-12', triadGroupId: 30 },
-		])
+	it('shows the first open puzzle date after consecutive assignments', () => {
+		jasmine.clock().install()
+		jasmine.clock().mockDate(new Date('2026-10-04T12:00:00.000Z'))
 
-		fixture.detectChanges()
+		try {
+			component.dailySchedules.set([
+				{ id: 1, puzzleDate: '2026-10-04', triadGroupId: 10 },
+				{ id: 2, puzzleDate: '2026-10-06', triadGroupId: 20 },
+				{ id: 3, puzzleDate: '2026-10-05', triadGroupId: 30 },
+			])
 
-		const jumpButton = fixture.nativeElement.querySelector('button[aria-label^="Jump to the first unscheduled triad group"]') as HTMLButtonElement
-		expect(component.firstAvailablePuzzleDateYmd()).toBe('2026-09-01')
-		expect(jumpButton.textContent).toContain('2026-09-01')
+			fixture.detectChanges()
+
+			const jumpButton = fixture.nativeElement.querySelector('button[aria-label^="Jump to the first unscheduled triad group"]') as HTMLButtonElement
+			expect(component.firstAvailablePuzzleDateYmd()).toBe('2026-10-07')
+			expect(jumpButton.textContent).toContain('2026-10-07')
+		} finally {
+			jasmine.clock().uninstall()
+		}
+	})
+
+	it('shows the first unscheduled date instead of skipping a gap', () => {
+		jasmine.clock().install()
+		jasmine.clock().mockDate(new Date('2026-10-04T12:00:00.000Z'))
+
+		try {
+			component.dailySchedules.set([
+				{ id: 1, puzzleDate: '2026-10-04', triadGroupId: 10 },
+				{ id: 2, puzzleDate: '2026-10-06', triadGroupId: 20 },
+			])
+
+			expect(component.firstAvailablePuzzleDateYmd()).toBe('2026-10-05')
+		} finally {
+			jasmine.clock().uninstall()
+		}
 	})
 
 	it('loads ordered pages until the first unscheduled group is available for the schedule jump', () => {
@@ -260,6 +283,15 @@ describe('TriadManagementPage', () => {
 		component.searchQuery.set('apple')
 		api.getTriadGroups.calls.reset()
 		api.getTriadGroups.and.returnValues(of(scheduledGroups), of([firstUnscheduled]))
+		dailyScheduleApi.getSchedules.and.returnValue(
+			of(
+				scheduledGroups.map((group, index) => ({
+					id: index + 1,
+					puzzleDate: `2026-08-${String(index + 1).padStart(2, '0')}`,
+					triadGroupId: group.id,
+				})),
+			),
+		)
 
 		component.onJumpToScheduleBoundary()
 
@@ -271,6 +303,14 @@ describe('TriadManagementPage', () => {
 		expect(component.triadGroups().at(-1)).toEqual(firstUnscheduled)
 		expect(component.hasMore()).toBeFalse()
 		expect(component.isJumpingToScheduleBoundary()).toBeFalse()
+	})
+
+	it('refreshes schedules when the management tab regains focus', () => {
+		dailyScheduleApi.getSchedules.calls.reset()
+
+		component.onWindowFocus()
+
+		expect(dailyScheduleApi.getSchedules).toHaveBeenCalledOnceWith(0, 100)
 	})
 
 	it('clears the difficulty filter before jumping to the next open schedule boundary', () => {
@@ -380,5 +420,16 @@ describe('TriadManagementPage', () => {
 		expect(dailyScheduleApi.deleteSchedule).toHaveBeenCalledWith(7)
 		expect(component.loadDailySchedules).not.toHaveBeenCalled()
 		expect(component.loadTriadGroups).not.toHaveBeenCalled()
+	})
+
+	it('refreshes schedule state after a scheduling conflict', () => {
+		const group = triadGroup(1, 'scheduled')
+		dailyScheduleApi.createSchedule.and.returnValue(throwError(() => new Error('A puzzle is already scheduled for 2026-10-05.')))
+		dailyScheduleApi.getSchedules.calls.reset()
+
+		component.onDailyScheduleSubmit({ triadGroup: group, puzzleDate: '2026-10-05' })
+
+		expect(dailyScheduleApi.createSchedule).toHaveBeenCalledWith('2026-10-05', group.id)
+		expect(dailyScheduleApi.getSchedules).toHaveBeenCalledOnceWith(0, 100)
 	})
 })
