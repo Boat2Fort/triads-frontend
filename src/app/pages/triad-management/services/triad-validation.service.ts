@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core'
 
 import { TriadGroupFormData } from '../interfaces/triad-group.interface'
+import { buildFourthTriadReceipt, formatFourthTriadReceipt } from './fourth-triad-receipt'
 
 @Injectable({
 	providedIn: 'root',
@@ -49,60 +50,18 @@ export class TriadValidationService {
 			}
 		})
 
-		// Check keywords of triads 1-3 are substrings of full phrases in triad 4
-		if (data.triad4.fullPhrases && data.triad4.fullPhrases.length === 3) {
-			const triad4FullPhrases = data.triad4.fullPhrases.map((fullPhrase) => fullPhrase.trim())
-			const keywords1to3 = [
-				{ keyword: data.triad1.keyword?.trim() || '', name: 'Triad 1' },
-				{ keyword: data.triad2.keyword?.trim() || '', name: 'Triad 2' },
-				{ keyword: data.triad3.keyword?.trim() || '', name: 'Triad 3' },
-			].filter((item) => item.keyword !== '')
+		// The final triad must provide a one-to-one proof for the first three keywords.
+		if (data.triad4.fullPhrases && data.triad4.fullPhrases.length === 3 && data.triad4.keyword.trim() !== '') {
+			const keywords1to3 = [data.triad1.keyword, data.triad2.keyword, data.triad3.keyword].map((keyword) => keyword.trim()).filter(Boolean)
 
-			if (keywords1to3.length === 3 && triad4FullPhrases.every((fp) => fp !== '')) {
-				// Check each keyword is a substring of exactly one full phrase
-				const keywordMatches = new Map<string, number[]>()
-
-				keywords1to3.forEach(({ keyword, name }) => {
-					const keywordUpper = keyword.toUpperCase()
-					const matchingPhraseIndices: number[] = []
-
-					triad4FullPhrases.forEach((fullPhrase, phraseIndex) => {
-						if (fullPhrase.toUpperCase().includes(keywordUpper)) {
-							matchingPhraseIndices.push(phraseIndex)
-						}
-					})
-
-					if (matchingPhraseIndices.length === 0) {
-						errors.push(`Triad 4: Full phrases must contain "${keyword}" from ${name} as a substring`)
-					} else if (matchingPhraseIndices.length > 1) {
-						errors.push(
-							`Triad 4: Keyword "${keyword}" from ${name} must be a substring of exactly one full phrase, but found in ${matchingPhraseIndices.length} phrases`,
-						)
-					} else {
-						keywordMatches.set(keyword, matchingPhraseIndices)
-					}
+			if (keywords1to3.length === 3) {
+				const receipt = buildFourthTriadReceipt(keywords1to3, {
+					keyword: data.triad4.keyword.trim(),
+					fullPhrases: data.triad4.fullPhrases.map((fullPhrase) => fullPhrase.trim()),
 				})
 
-				// Check each full phrase contains exactly one keyword
-				if (errors.length === 0) {
-					triad4FullPhrases.forEach((fullPhrase) => {
-						const fullPhraseUpper = fullPhrase.toUpperCase()
-						const matchingKeywords: string[] = []
-
-						keywords1to3.forEach(({ keyword }) => {
-							if (fullPhraseUpper.includes(keyword.toUpperCase())) {
-								matchingKeywords.push(keyword)
-							}
-						})
-
-						if (matchingKeywords.length === 0) {
-							errors.push(`Triad 4: Full phrase "${fullPhrase}" must contain exactly one keyword from Triads 1-3 as a substring`)
-						} else if (matchingKeywords.length > 1) {
-							errors.push(
-								`Triad 4: Full phrase "${fullPhrase}" contains multiple keywords (${matchingKeywords.join(', ')}). Each full phrase must contain exactly one keyword`,
-							)
-						}
-					})
+				if (!receipt.valid) {
+					errors.push(`Triad 4 receipt failed: ${formatFourthTriadReceipt(receipt)}`)
 				}
 			}
 		}

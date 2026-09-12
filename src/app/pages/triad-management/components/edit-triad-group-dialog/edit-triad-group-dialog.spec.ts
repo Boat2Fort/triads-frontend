@@ -16,7 +16,7 @@ describe('EditTriadGroupDialog', () => {
 		triad1: { id: 10, keyword: 'TEST', cues: ['TEST1', 'TEST2', 'TEST3'], fullPhrases: ['TEST1', 'TEST2', 'TEST3'] },
 		triad2: { id: 20, keyword: 'SAMPLE', cues: ['SAMPLE1', 'SAMPLE2', 'SAMPLE3'], fullPhrases: ['SAMPLE1', 'SAMPLE2', 'SAMPLE3'] },
 		triad3: { id: 30, keyword: 'DEMO', cues: ['DEMO1', 'DEMO2', 'DEMO3'], fullPhrases: ['DEMO1', 'DEMO2', 'DEMO3'] },
-		triad4: { id: 40, keyword: 'FINAL', cues: ['TEST', 'SAMPLE', 'DEMO'], fullPhrases: ['TEST', 'SAMPLE', 'DEMO'] },
+		triad4: { id: 40, keyword: 'FINAL', cues: ['TEST', 'SAMPLE', 'DEMO'], fullPhrases: ['TEST FINAL', 'SAMPLE FINAL', 'DEMO FINAL'] },
 	}
 
 	beforeEach(async () => {
@@ -39,7 +39,7 @@ describe('EditTriadGroupDialog', () => {
 		expect(component.triad1Group.get('keyword')?.value).toBe('TEST')
 		expect(component.triad1Group.get('fullPhrase1')?.value).toBe('TEST1')
 		expect(component.triad2Group.get('keyword')?.value).toBe('SAMPLE')
-		expect(component.triad4Group.get('fullPhrase1')?.value).toBe('TEST')
+		expect(component.triad4Group.get('fullPhrase1')?.value).toBe('TEST FINAL')
 	})
 
 	it('should emit whenCanceled on close', () => {

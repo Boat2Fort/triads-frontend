@@ -36,7 +36,7 @@ describe('AddTriadGroupDialog', () => {
 			triad1: { keyword: 'TEST', fullPhrase1: 'TEST1', fullPhrase2: 'TEST2', fullPhrase3: 'TEST3' },
 			triad2: { keyword: 'SAMPLE', fullPhrase1: 'SAMPLE1', fullPhrase2: 'SAMPLE2', fullPhrase3: 'SAMPLE3' },
 			triad3: { keyword: 'DEMO', fullPhrase1: 'DEMO1', fullPhrase2: 'DEMO2', fullPhrase3: 'DEMO3' },
-			triad4: { keyword: 'FINAL', fullPhrase1: 'TEST', fullPhrase2: 'SAMPLE', fullPhrase3: 'DEMO' },
+			triad4: { keyword: 'FINAL', fullPhrase1: 'TEST FINAL', fullPhrase2: 'SAMPLE FINAL', fullPhrase3: 'DEMO FINAL' },
 		})
 
 		spyOn(component.whenCreated, 'emit')
