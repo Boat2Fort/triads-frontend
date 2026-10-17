@@ -41,6 +41,9 @@ export class BrainWarmingPlayButton implements OnDestroy {
 
 	readonly playLabelText = input('Play Now')
 
+	/** Set to true to restore the brain-warming intro before opening the game. */
+	readonly warmupEnabled = input(false)
+
 	readonly navigateCommands = input<readonly string[]>(['/classic'])
 
 	/** When true, authorizes the next play-route navigation for the play route guard. */
@@ -107,6 +110,11 @@ export class BrainWarmingPlayButton implements OnDestroy {
 		}
 		this.gameCuePrefetch.startPrefetch()
 
+		if (!this.warmupEnabled()) {
+			this.navigateToGame()
+			return
+		}
+
 		play.style.opacity = '0'
 		play.style.pointerEvents = 'none'
 		this.clearTimers()
@@ -122,15 +130,17 @@ export class BrainWarmingPlayButton implements OnDestroy {
 		})
 
 		const navigateAt = PLAY_HIDE_DELAY_MS + BURST_AT_MS + NAV_AFTER_BURST_MS
-		this.after(navigateAt, () => {
-			if (this.authorizeNextPlayNavigation()) {
-				this.playRouteIntent.markPending()
+		this.after(navigateAt, () => this.navigateToGame())
+	}
+
+	private navigateToGame() {
+		if (this.authorizeNextPlayNavigation()) {
+			this.playRouteIntent.markPending()
+		}
+		void this.router.navigate(this.navigateCommands()).then((didNavigate) => {
+			if (!didNavigate) {
+				this.resetVisualState()
 			}
-			void this.router.navigate(this.navigateCommands()).then((didNavigate) => {
-				if (!didNavigate) {
-					this.resetVisualState()
-				}
-			})
 		})
 	}
 
