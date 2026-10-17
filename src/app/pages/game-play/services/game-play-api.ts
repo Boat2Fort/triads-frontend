@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core'
 
 import { Difficulty } from '../../../shared/enums/difficulty.enum'
 import { ClassicExtraQuotaInfo } from '../../../shared/interfaces/classic-extra.interface'
+import { GlobalStore } from '../../../state/global.store'
 import { SolvedTriad } from '../interfaces/triad.interface'
 
 type ClassicExtraQuotaFields = ClassicExtraQuotaInfo
@@ -56,6 +57,8 @@ export type DailyCuesResponse =
 export class GamePlayApi {
 	private readonly httpClient = inject(HttpClient)
 
+	private readonly store = inject(GlobalStore)
+
 	getDailyTodayInfo() {
 		return this.httpClient.get<DailyTodayInfoResponse>('triads/daily/today')
 	}
@@ -68,6 +71,7 @@ export class GamePlayApi {
 		return this.httpClient.post<{ ok: true; puzzleDate: string; nextPuzzleAt: string }>('triads/daily/complete', {
 			outcome,
 			score,
+			...(this.store.dailyPuzzleDate() ? { puzzleDate: this.store.dailyPuzzleDate() } : {}),
 		})
 	}
 
@@ -97,12 +101,17 @@ export class GamePlayApi {
 		}>('triads/standalone-classic/cues', { params })
 	}
 
+	private gameContext(): Record<string, string | number> {
+		const triadGroupId = this.store.triadGroupId()
+		return triadGroupId ? { triadGroupId, triadsStep: this.store.triadsStep() } : {}
+	}
+
 	checkTriad(cues: string[]) {
-		return this.httpClient.get<boolean>('triads/check-triad', { params: { cues } })
+		return this.httpClient.get<boolean>('triads/check-triad', { params: { cues, ...this.gameContext() } })
 	}
 
 	checkAnswer(cues: string[], answer: string) {
-		return this.httpClient.get<boolean | SolvedTriad>('triads/check-answer', { params: { cues, answer } })
+		return this.httpClient.get<boolean | SolvedTriad>('triads/check-answer', { params: { cues, answer, ...this.gameContext() } })
 	}
 
 	fetchFinalTriadCues(triadGroupId: number | string) {

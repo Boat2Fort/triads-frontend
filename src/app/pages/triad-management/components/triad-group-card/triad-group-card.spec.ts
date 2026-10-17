@@ -11,10 +11,10 @@ describe('TriadGroupCard', () => {
 		id: 1,
 		active: true,
 		difficulty: 'EASY',
-		triad1: { id: 10, keyword: 'TEST', cues: ['TEST1', 'TEST2', 'TEST3'], fullPhrases: [] },
-		triad2: { id: 20, keyword: 'SAMPLE', cues: ['SAMPLE1', 'SAMPLE2', 'SAMPLE3'], fullPhrases: [] },
-		triad3: { id: 30, keyword: 'DEMO', cues: ['DEMO1', 'DEMO2', 'DEMO3'], fullPhrases: [] },
-		triad4: { id: 40, keyword: 'FINAL', cues: ['TEST', 'SAMPLE', 'DEMO'], fullPhrases: [] },
+		triad1: { id: 10, keyword: 'TEST', cues: ['TEST1', 'TEST2', 'TEST3'], fullPhrases: ['TEST FIRST', 'SAMPLE SECOND', 'DEMO THIRD'] },
+		triad2: { id: 20, keyword: 'SAMPLE', cues: ['SAMPLE1', 'SAMPLE2', 'SAMPLE3'], fullPhrases: ['TEST FIRST', 'SAMPLE SECOND', 'DEMO THIRD'] },
+		triad3: { id: 30, keyword: 'DEMO', cues: ['DEMO1', 'DEMO2', 'DEMO3'], fullPhrases: ['TEST FIRST', 'SAMPLE SECOND', 'DEMO THIRD'] },
+		triad4: { id: 40, keyword: 'FINAL', cues: ['TEST', 'SAMPLE', 'DEMO'], fullPhrases: ['TEST FIRST', 'SAMPLE SECOND', 'DEMO THIRD'] },
 	}
 
 	beforeEach(async () => {

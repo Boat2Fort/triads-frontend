@@ -15,6 +15,8 @@ export class AutoCapitalize {
 	onInput(event: Event) {
 		const target = event.target as HTMLInputElement
 		const upperValue = target.value.toUpperCase()
+		// Other input listeners (including the form value accessor) read this same element.
+		target.value = upperValue
 
 		if (this.ngControl?.control) {
 			this.ngControl.control.setValue(upperValue, { emitEvent: false, emitModelToViewChange: false })

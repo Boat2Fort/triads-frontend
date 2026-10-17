@@ -12,6 +12,7 @@ describe('BubbleContainer', () => {
 		}).compileComponents()
 
 		fixture = TestBed.createComponent(BubbleContainer)
+		fixture.componentRef.setInput('cues', [])
 		component = fixture.componentInstance
 		fixture.detectChanges()
 	})

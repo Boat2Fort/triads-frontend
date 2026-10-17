@@ -12,11 +12,12 @@ export const httpErrorsInterceptor: HttpInterceptorFn = (req, next) => {
 		catchError((caughtError) => {
 			const apiError = parseApiError(caughtError)
 
-			queueMicrotask(() => {
+			// Promise-based consumers must get a chance to mark the error handled.
+			setTimeout(() => {
 				if (!apiError.handled) {
 					snackbarService.showSnackbar(apiError.userMessage)
 				}
-			})
+			}, 0)
 
 			return throwError(() => apiError)
 		}),

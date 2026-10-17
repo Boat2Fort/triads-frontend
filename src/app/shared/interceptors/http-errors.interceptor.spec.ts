@@ -67,7 +67,7 @@ describe('httpErrorsInterceptor', () => {
 		)
 
 		await promise
-		await Promise.resolve()
+		await new Promise<void>((resolve) => setTimeout(resolve, 0))
 
 		expect(snackbarService.showSnackbar).toHaveBeenCalledWith('Bad request payload')
 	})
@@ -92,7 +92,7 @@ describe('httpErrorsInterceptor', () => {
 		)
 
 		await promise
-		await Promise.resolve()
+		await new Promise<void>((resolve) => setTimeout(resolve, 0))
 
 		expect(snackbarService.showSnackbar).not.toHaveBeenCalled()
 	})

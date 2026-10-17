@@ -121,7 +121,12 @@ export class TurnHintService {
 	}
 
 	getHint(cues: string[], hintExtra?: HintExtra) {
-		const params: { cues: string[]; with?: HintExtra } = { cues }
+		const params: { cues: string[]; with?: HintExtra; triadGroupId?: string | number; triadsStep?: string } = { cues }
+		const triadGroupId = this.store.triadGroupId()
+		if (triadGroupId) {
+			params.triadGroupId = triadGroupId
+			params.triadsStep = this.store.triadsStep()
+		}
 
 		if (hintExtra !== undefined) {
 			params.with = hintExtra

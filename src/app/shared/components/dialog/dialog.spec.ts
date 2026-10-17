@@ -12,6 +12,7 @@ describe('Dialog', () => {
 		}).compileComponents()
 
 		fixture = TestBed.createComponent(Dialog)
+		fixture.componentRef.setInput('title', 'Test dialog')
 		component = fixture.componentInstance
 		fixture.detectChanges()
 	})

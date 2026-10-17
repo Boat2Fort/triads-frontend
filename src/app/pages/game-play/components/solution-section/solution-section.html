@@ -1,4 +1,10 @@
 <div class="w-full h-full flex flex-col justify-center items-center">
+	@if (store.triadsStep() === 'FINAL' && !store.finalTriadCues()?.length && !store.isFetchingFinalTriadCues()) {
+		<button type="button" (click)="loadFinalTriadCues()" class="btn triad-gradient">Retry bonus round</button>
+		@if (serverError(); as message) {
+			<p class="mt-2 text-center text-sm text-error">{{ message }}</p>
+		}
+	}
 	<div
 		class="w-full h-fit flex-col justify-center items-center px-4 md:px-6 lg:px-8 py-2"
 		[class]="{ flex: store.gamePlayState() === GamePlayState.CHECK_SOLUTION, hidden: store.gamePlayState() !== GamePlayState.CHECK_SOLUTION }">

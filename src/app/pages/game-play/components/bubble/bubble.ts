@@ -31,7 +31,12 @@ export class Bubble {
 	pop = computed<boolean>(() => this.store.cuesToExplode().includes(this.cue()))
 
 	isDisabled = computed<boolean>(
-		() => this.store.isCheckingTriad() || this.store.isCheckingAnswer() || this.store.isFetchingHint() || this.store.isFetchingFinalTriadCues(),
+		() =>
+			![GamePlayState.PLAYING, GamePlayState.CHECK_SOLUTION, GamePlayState.ACCEPT_ANSWER].includes(this.store.gamePlayState()) ||
+			this.store.isCheckingTriad() ||
+			this.store.isCheckingAnswer() ||
+			this.store.isFetchingHint() ||
+			this.store.isFetchingFinalTriadCues(),
 	)
 
 	readonly bubbleBackgroundImage = computed(() => {

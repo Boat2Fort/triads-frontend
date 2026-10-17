@@ -1,6 +1,6 @@
 import { AfterViewChecked, ChangeDetectorRef, Component, effect, ElementRef, inject, OnDestroy, OnInit, output, signal, viewChild } from '@angular/core'
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms'
-import { delay, filter, firstValueFrom, Subscription, tap } from 'rxjs'
+import { delay, filter, firstValueFrom, Subject, Subscription, takeUntil, tap } from 'rxjs'
 
 import { AutoCapitalize } from '../../../../shared/directives/auto-capitalize'
 import { ReverseErase } from '../../../../shared/directives/reverse-erase'
@@ -45,6 +45,12 @@ export class SolutionSection implements OnInit, AfterViewChecked, OnDestroy {
 	protected readonly GamePlayState = GamePlayState
 
 	private readonly subscriptions$ = new Subscription()
+
+	private destroyed = false
+
+	private requestGeneration = 0
+
+	private readonly requestsCancelled$ = new Subject<void>()
 
 	private timeoutIds: ReturnType<typeof setTimeout>[] = []
 
@@ -124,9 +130,13 @@ export class SolutionSection implements OnInit, AfterViewChecked, OnDestroy {
 
 	ngOnInit() {
 		this.subscribeToAnswerFieldChanges()
+		if (this.store.triadsStep() === 'FINAL' && !this.store.finalTriadCues()?.length) void this.loadFinalTriadCues()
 	}
 
 	ngOnDestroy() {
+		this.destroyed = true
+		this.requestsCancelled$.next()
+		this.requestsCancelled$.complete()
 		this.subscriptions$.unsubscribe()
 		// CRITICAL: Clear all pending timeouts
 		this.timeoutIds.forEach((id) => clearTimeout(id))
@@ -134,6 +144,9 @@ export class SolutionSection implements OnInit, AfterViewChecked, OnDestroy {
 	}
 
 	resetComponentState() {
+		this.requestGeneration++
+		this.requestsCancelled$.next()
+		this.serverError.set(null)
 		// Reset form control
 		this.answerFormControl.reset()
 		// Reset focus flag
@@ -175,7 +188,13 @@ export class SolutionSection implements OnInit, AfterViewChecked, OnDestroy {
 		}
 	}
 
+	private isBusy(): boolean {
+		return this.store.isCheckingTriad() || this.store.isCheckingAnswer() || this.store.isFetchingHint() || this.store.isFetchingFinalTriadCues()
+	}
+
 	checkTriad() {
+		if (this.isBusy() || this.store.gamePlayState() !== GamePlayState.CHECK_SOLUTION) return
+		this.serverError.set(null)
 		const selectedCues = this.store.selectedCues()
 
 		if (selectedCues.length === 3) {
@@ -223,6 +242,7 @@ export class SolutionSection implements OnInit, AfterViewChecked, OnDestroy {
 								this.gamePlayLogic.handleGameLost()
 							}
 						}),
+						takeUntil(this.requestsCancelled$),
 					)
 					.subscribe({
 						error: (error) => {
@@ -235,21 +255,26 @@ export class SolutionSection implements OnInit, AfterViewChecked, OnDestroy {
 	}
 
 	submitAnswer(answer: string | null) {
+		if (this.isBusy() || this.isErasing || this.store.gamePlayState() !== GamePlayState.ACCEPT_ANSWER) return
+		this.serverError.set(null)
 		const trimmedAnswer = answer?.trim() ?? ''
 		const selectedCues = this.store.selectedCues()
 		if (trimmedAnswer.length > 0 && selectedCues && selectedCues.length === 3) {
 			this.store.setIsCheckingAnswer(true)
 			this.subscriptions$.add(
-				this.gamePlayApi.checkAnswer(selectedCues, trimmedAnswer).subscribe({
-					next: (response) => {
-						this.handleAnswerResponse(response)
-						this.store.setIsCheckingAnswer(false)
-					},
-					error: (error) => {
-						this.store.setIsCheckingAnswer(false)
-						this.handleApiError(error)
-					},
-				}),
+				this.gamePlayApi
+					.checkAnswer(selectedCues, trimmedAnswer)
+					.pipe(takeUntil(this.requestsCancelled$))
+					.subscribe({
+						next: (response) => {
+							this.handleAnswerResponse(response)
+							this.store.setIsCheckingAnswer(false)
+						},
+						error: (error) => {
+							this.store.setIsCheckingAnswer(false)
+							this.handleApiError(error)
+						},
+					}),
 			)
 		}
 	}
@@ -347,6 +372,7 @@ export class SolutionSection implements OnInit, AfterViewChecked, OnDestroy {
 		// This means the answer was correct
 		if (response && typeof response !== 'boolean') {
 			// Reset deferred turn flag on correct answer (turn was not consumed)
+			this.store.setGamePlayState(GamePlayState.CORRECT_ANSWER)
 			this.store.setHintUsedWithOneTurnRemaining(false)
 			this.store.clearTriadHintSnapshotForCues(response.cues)
 			this.bubblePopAudio.playbackRate = 0.7
@@ -407,22 +433,7 @@ export class SolutionSection implements OnInit, AfterViewChecked, OnDestroy {
 					if (this.store.triadsStep() === 'INITIAL' && this.store.cues()?.length === 0) {
 						this.store.updateTriadStep('FINAL')
 
-						this.store.setIsFetchingFinalTriadCues(true)
-						this.getFinalTriadCuesCues()
-							.then((finalTriadCuesCues) => {
-								this.store.setFinalTriadCues(finalTriadCuesCues)
-								// Auto-select final triad cues (bonus round) - always 3 cues
-								if (finalTriadCuesCues && finalTriadCuesCues.length === 3) {
-									this.store.setSelectedCues([...finalTriadCuesCues])
-									this.store.setGamePlayState(GamePlayState.CHECK_SOLUTION)
-								}
-							})
-							.catch((error) => {
-								this.handleApiError(error)
-							})
-							.finally(() => {
-								this.store.setIsFetchingFinalTriadCues(false)
-							})
+						void this.loadFinalTriadCues()
 					}
 					// If the game was in its final stage and the player answers the last triad, finalize the game.
 					else if (this.store.triadsStep() === 'FINAL') {
@@ -518,14 +529,24 @@ export class SolutionSection implements OnInit, AfterViewChecked, OnDestroy {
 		}
 	}
 
-	private async getFinalTriadCuesCues() {
+	async loadFinalTriadCues() {
 		const triadGroupId = this.store.triadGroupId()
-
-		if (triadGroupId) {
-			return await firstValueFrom(this.gamePlayApi.fetchFinalTriadCues(triadGroupId))
+		if (!triadGroupId || this.isBusy() || this.store.triadsStep() !== 'FINAL' || this.store.finalTriadCues()?.length) return
+		this.serverError.set(null)
+		this.store.setIsFetchingFinalTriadCues(true)
+		const generation = this.requestGeneration
+		try {
+			const cues = await firstValueFrom(this.gamePlayApi.fetchFinalTriadCues(triadGroupId).pipe(takeUntil(this.requestsCancelled$)))
+			if (this.destroyed || generation !== this.requestGeneration) return
+			if (!cues || cues.length !== 3) throw new Error('Invalid bonus cues')
+			this.store.setFinalTriadCues(cues)
+			this.store.setSelectedCues([...cues])
+			this.store.setGamePlayState(GamePlayState.CHECK_SOLUTION)
+		} catch (error) {
+			if (!this.destroyed && generation === this.requestGeneration) this.handleApiError(error)
+		} finally {
+			if (!this.destroyed && generation === this.requestGeneration) this.store.setIsFetchingFinalTriadCues(false)
 		}
-
-		return Promise.reject()
 	}
 
 	private subscribeToAnswerFieldChanges() {

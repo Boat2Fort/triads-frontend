@@ -12,6 +12,12 @@ describe('SolvedTriad', () => {
 		}).compileComponents()
 
 		fixture = TestBed.createComponent(SolvedTriad)
+		fixture.componentRef.setInput('solvedTriad', {
+			id: 1,
+			keyword: 'BUTTON',
+			cues: ['PUSH-', 'CAMPAIGN', 'PANIC'],
+			fullPhrases: ['PUSH-BUTTON', 'CAMPAIGN BUTTON', 'PANIC BUTTON'],
+		})
 		component = fixture.componentInstance
 		fixture.detectChanges()
 	})

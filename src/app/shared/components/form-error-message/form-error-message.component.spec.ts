@@ -6,9 +6,10 @@ import { FormErrorMessageComponent } from './form-error-message.component'
 describe('FormErrorMessageComponent', () => {
 	let component: FormErrorMessageComponent
 	let fixture: ComponentFixture<FormErrorMessageComponent>
-	const control = new FormControl('', Validators.required)
+	let control: FormControl
 
 	beforeEach(async () => {
+		control = new FormControl('', Validators.required)
 		await TestBed.configureTestingModule({
 			imports: [FormErrorMessageComponent],
 		}).compileComponents()

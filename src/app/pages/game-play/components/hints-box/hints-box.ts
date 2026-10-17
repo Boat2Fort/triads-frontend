@@ -1,7 +1,7 @@
 import { Component, computed, inject, OnDestroy, signal } from '@angular/core'
 import { ReactiveFormsModule } from '@angular/forms'
 import { ActionSheetController } from '@ionic/angular/standalone'
-import { delay, filter, firstValueFrom, Subscription, tap, timer } from 'rxjs'
+import { Subscription, tap, timer } from 'rxjs'
 
 import { isApiError, parseApiError } from '../../../../shared/errors/api-error.util'
 import { AssetPreloadService } from '../../../../shared/services/asset-preload.service'
@@ -36,6 +36,10 @@ export class HintsBox implements OnDestroy {
 
 	private activeActionSheet: HTMLIonActionSheetElement | null = null
 
+	private destroyed = false
+
+	private openingActionSheet = false
+
 	private readonly subscriptions$ = new Subscription()
 
 	readonly lifesaverIconUrl = computed(() => {
@@ -44,18 +48,27 @@ export class HintsBox implements OnDestroy {
 	})
 
 	ngOnDestroy() {
+		this.destroyed = true
 		this.subscriptions$.unsubscribe()
 		this.activeActionSheet?.dismiss()
 	}
 
 	areHintsDisabledDueToTurns(): boolean {
-		return !this.turnHintService.canUseHint(this.store.turns(), this.store.hints())
+		return (
+			![GamePlayState.PLAYING, GamePlayState.CHECK_SOLUTION, GamePlayState.ACCEPT_ANSWER].includes(this.store.gamePlayState()) ||
+			this.store.isCheckingTriad() ||
+			this.store.isCheckingAnswer() ||
+			this.store.isFetchingHint() ||
+			this.store.isFetchingFinalTriadCues() ||
+			!this.turnHintService.canUseHint(this.store.turns(), this.store.hints())
+		)
 	}
 
 	onHintClick() {
-		if (this.areHintsDisabledDueToTurns()) {
+		if (this.areHintsDisabledDueToTurns() || this.activeActionSheet || this.openingActionSheet) {
 			return
 		}
+		this.serverError.set(null)
 
 		const availableHints = this.turnHintService.numberOfAvailableHints(this.store.hints())
 		const selectedCues = this.store.selectedCues()
@@ -105,42 +118,57 @@ export class HintsBox implements OnDestroy {
 	}
 
 	private async showHintChoiceSheet() {
-		const usedTypes = this.store.usedHintTypes()
-		const keywordLengthUsed = usedTypes.includes('KEYWORD_LENGTH')
-		const firstLetterUsed = usedTypes.includes('FIRST_LETTER')
+		if (this.destroyed || this.activeActionSheet || this.openingActionSheet) return
+		this.openingActionSheet = true
+		try {
+			const usedTypes = this.store.usedHintTypes()
+			const keywordLengthUsed = usedTypes.includes('KEYWORD_LENGTH')
+			const firstLetterUsed = usedTypes.includes('FIRST_LETTER')
 
-		const sheet = await this.actionSheetController.create({
-			header: 'Choose your hint',
-			subHeader: 'Pick one of the options below to help solve the Triad.',
-			buttons: [
-				{
-					text: keywordLengthUsed ? 'Number of letters (Already used)' : 'Number of letters',
-					handler: () => {
-						if (!keywordLengthUsed) {
-							this.useHint('KEYWORD_LENGTH')
-						}
-						return !keywordLengthUsed
+			const sheet = await this.actionSheetController.create({
+				header: 'Choose your hint',
+				subHeader: 'Pick one of the options below to help solve the Triad.',
+				buttons: [
+					{
+						text: keywordLengthUsed ? 'Number of letters (Already used)' : 'Number of letters',
+						handler: () => {
+							if (!keywordLengthUsed) {
+								this.useHint('KEYWORD_LENGTH')
+							}
+							return !keywordLengthUsed
+						},
+						cssClass: keywordLengthUsed ? 'action-sheet-disabled' : '',
 					},
-					cssClass: keywordLengthUsed ? 'action-sheet-disabled' : '',
-				},
-				{
-					text: firstLetterUsed ? '1st letter of word (Already used)' : '1st letter of word',
-					handler: () => {
-						if (!firstLetterUsed) {
-							this.useHint('FIRST_LETTER')
-						}
-						return !firstLetterUsed
+					{
+						text: firstLetterUsed ? '1st letter of word (Already used)' : '1st letter of word',
+						handler: () => {
+							if (!firstLetterUsed) {
+								this.useHint('FIRST_LETTER')
+							}
+							return !firstLetterUsed
+						},
+						cssClass: firstLetterUsed ? 'action-sheet-disabled' : '',
 					},
-					cssClass: firstLetterUsed ? 'action-sheet-disabled' : '',
-				},
-				{
-					text: 'Cancel',
-					role: 'cancel',
-				},
-			],
-		})
-		this.activeActionSheet = sheet
-		await sheet.present()
+					{
+						text: 'Cancel',
+						role: 'cancel',
+					},
+				],
+			})
+			if (this.destroyed) {
+				void sheet.dismiss()
+				return
+			}
+			this.activeActionSheet = sheet
+			await sheet.present()
+			void sheet.onDidDismiss().then(() => {
+				if (this.activeActionSheet === sheet) this.activeActionSheet = null
+			})
+		} catch (error) {
+			if (!this.destroyed) this.handleApiError(error)
+		} finally {
+			this.openingActionSheet = false
+		}
 	}
 
 	private dismissActionSheet() {
@@ -152,11 +180,6 @@ export class HintsBox implements OnDestroy {
 		// Prevent hint usage if hints are disabled due to turns being used up
 		if (this.areHintsDisabledDueToTurns()) {
 			return
-		}
-
-		this.store.setHintUsage(true)
-		if (this.turnHintService.numberOfAvailableTurns(this.store.turns()) === 1) {
-			this.store.setHintUsedWithOneTurnRemaining(true)
 		}
 
 		// Check if user has 3 cues selected - if so, use those for the hint
@@ -174,82 +197,86 @@ export class HintsBox implements OnDestroy {
 			availableCues = cues && cues.length > 0 ? this.store.cues() : this.store.finalTriadCues()
 		}
 
-		if (availableCues) {
+		if (availableCues?.length) {
+			this.serverError.set(null)
 			try {
 				this.store.setIsFetchingHint(true)
-				firstValueFrom(this.turnHintService.getHint(availableCues, hintExtra))
-					.then((triadsForHint) => {
-						const hints = this.store.hints()
-						const hasHintCues = Boolean(triadsForHint?.hint?.length)
+				this.subscriptions$.add(
+					this.turnHintService.getHint(availableCues, hintExtra).subscribe({
+						next: (triadsForHint) => {
+							const hints = this.store.hints()
+							const hasHintCues = triadsForHint?.hint?.length === 3
 
-						if (hadThreeSelected && !hasHintCues) {
-							this.dismissActionSheet()
-							this.applyHintFailureForNonTriadSelection()
+							if (hadThreeSelected && !hasHintCues) {
+								this.store.setHintUsage(true)
+								this.store.setHintUsedWithOneTurnRemaining(this.turnHintService.numberOfAvailableTurns(this.store.turns()) === 1)
+								this.dismissActionSheet()
+								this.applyHintFailureForNonTriadSelection()
+								this.store.setIsFetchingHint(false)
+								return
+							}
+
+							if (triadsForHint?.hint && hasHintCues) {
+								const updatedHints = this.turnHintService.useHintToken(hints)
+								const hintCues = triadsForHint.hint
+								// Selection restoration clears hints, so select before applying the new hint.
+								if (!hadThreeSelected) this.store.setSelectedCues(hintCues)
+								// When the player uses a hint with an extra value, show a special hint
+								if (triadsForHint.with === 'KEYWORD_LENGTH') {
+									// Set keyword length hint, but preserve first letter if it exists
+									this.store.setKeywordLengthHint(triadsForHint.withValue ? Number(triadsForHint.withValue) : null)
+									// Track that this hint type is now active
+									this.store.setActiveHintType('KEYWORD_LENGTH')
+									// Track that this hint type has been used (so it stays disabled after wrong guesses)
+									this.store.addUsedHintType('KEYWORD_LENGTH')
+									// If first letter hint already exists, keep it for combination
+									// The first letter will be filled in InputSet when it's displayed
+									// Clear answerFieldValue$ since we're switching to InputSet
+									if (this.store.firstLetterHint()) {
+										this.gamePlayLogic.answerFieldValue$.next(null)
+									}
+								} else if (triadsForHint.with === 'FIRST_LETTER' && triadsForHint.withValue) {
+									// Store the first letter hint
+									this.store.setFirstLetterHint(triadsForHint.withValue)
+									// Track that this hint type is now active
+									this.store.setActiveHintType('FIRST_LETTER')
+									// Track that this hint type has been used (so it stays disabled after wrong guesses)
+									this.store.addUsedHintType('FIRST_LETTER')
+
+									// If keyword length hint already exists, we'll fill the first box in InputSet
+									// Otherwise, set it for the regular input field
+									if (this.store.keywordLengthHint() === null) {
+										// Ensure the answer field is enabled before focusing it
+										this.store.setIsCheckingTriad(false)
+										this.store.setIsCheckingAnswer(false)
+
+										this.gamePlayLogic.answerFieldValue$.next(triadsForHint.withValue)
+										// Set the flag to focus the answer field when it appears
+										this.gamePlayLogic.answerFieldFocus$.next(true)
+									}
+								}
+
+								// Close the extra hint modal
+								this.dismissActionSheet()
+
+								this.store.setHints(updatedHints)
+
+								// Skip the "Check Solution" step
+								this.store.setHintUsage(true)
+								this.store.setHintUsedWithOneTurnRemaining(this.turnHintService.numberOfAvailableTurns(this.store.turns()) === 1)
+								const result = this.turnHintService.applyHintOutcome(this.store.turns(), updatedHints, 'CORRECT')
+								this.store.setTurns(result.turns)
+								this.store.setGamePlayState(GamePlayState.ACCEPT_ANSWER)
+								this.gamePlayLogic.answerFieldFocus$.next(true)
+							}
 							this.store.setIsFetchingHint(false)
-							return
-						}
-
-						if (triadsForHint?.hint && triadsForHint.hint.length > 0) {
-							const updatedHints = this.turnHintService.useHintToken(hints)
-							const hintCues = triadsForHint.hint
-							// When the player uses a hint with an extra value, show a special hint
-							if (triadsForHint.with === 'KEYWORD_LENGTH') {
-								// Set keyword length hint, but preserve first letter if it exists
-								this.store.setKeywordLengthHint(triadsForHint.withValue ? Number(triadsForHint.withValue) : null)
-								// Track that this hint type is now active
-								this.store.setActiveHintType('KEYWORD_LENGTH')
-								// Track that this hint type has been used (so it stays disabled after wrong guesses)
-								this.store.addUsedHintType('KEYWORD_LENGTH')
-								// If first letter hint already exists, keep it for combination
-								// The first letter will be filled in InputSet when it's displayed
-								// Clear answerFieldValue$ since we're switching to InputSet
-								if (this.store.firstLetterHint()) {
-									this.gamePlayLogic.answerFieldValue$.next(null)
-								}
-							} else if (triadsForHint.with === 'FIRST_LETTER' && triadsForHint.withValue) {
-								// Store the first letter hint
-								this.store.setFirstLetterHint(triadsForHint.withValue)
-								// Track that this hint type is now active
-								this.store.setActiveHintType('FIRST_LETTER')
-								// Track that this hint type has been used (so it stays disabled after wrong guesses)
-								this.store.addUsedHintType('FIRST_LETTER')
-
-								// If keyword length hint already exists, we'll fill the first box in InputSet
-								// Otherwise, set it for the regular input field
-								if (this.store.keywordLengthHint() === null) {
-									// Ensure the answer field is enabled before focusing it
-									this.store.setIsCheckingTriad(false)
-									this.store.setIsCheckingAnswer(false)
-
-									this.gamePlayLogic.answerFieldValue$.next(triadsForHint.withValue)
-									// Set the flag to focus the answer field when it appears
-									this.gamePlayLogic.answerFieldFocus$.next(true)
-								}
-							}
-
-							// Close the extra hint modal
-							this.dismissActionSheet()
-
-							// Only update selected cues if user didn't originally have 3 selected
-							// This preserves the user's selection when they request a hint for their selected triad
-							if (!hadThreeSelected) {
-								// Show the hint cues as selected on the UI
-								this.store.setSelectedCues(hintCues)
-							}
-
-							// Update the hints and keep turns as-is; the turn cost
-							// will be applied later based on the final outcome.
-							this.store.setHints(updatedHints)
-
-							// Skip the "Check Solution" step
-							this.checkTriad()
-						}
-						this.store.setIsFetchingHint(false)
-					})
-					.catch((error) => {
-						this.store.setIsFetchingHint(false)
-						this.handleApiError(error)
-					})
+						},
+						error: (error) => {
+							this.store.setIsFetchingHint(false)
+							this.handleApiError(error)
+						},
+					}),
+				)
 			} catch (error) {
 				this.store.setIsFetchingHint(false)
 				this.handleApiError(error)
@@ -296,72 +323,6 @@ export class HintsBox implements OnDestroy {
 				)
 				.subscribe(),
 		)
-	}
-
-	checkTriad() {
-		const selectedCues = this.store.selectedCues()
-
-		if (selectedCues.length === 3) {
-			this.store.setIsCheckingTriad(true)
-			this.subscriptions$.add(
-				this.gamePlayApi
-					.checkTriad(selectedCues)
-					.pipe(
-						tap((success) => {
-							this.store.setIsCheckingTriad(false)
-							if (success) {
-								// Hint + Correct path
-								const { turns, hints, gameEnds } = this.turnHintService.applyHintOutcome(this.store.turns(), this.store.hints(), 'CORRECT')
-								this.store.setTurns(turns)
-								this.store.setHints(hints)
-
-								if (gameEnds) {
-									this.gamePlayLogic.handleGameLost()
-									return
-								}
-
-								this.store.setGamePlayState(GamePlayState.ACCEPT_ANSWER)
-								this.gamePlayLogic.answerFieldFocus$.next(true)
-							} else {
-								// Hint + Fail path
-								const { turns, hints, gameEnds } = this.turnHintService.applyHintOutcome(this.store.turns(), this.store.hints(), 'FAIL')
-								this.store.setTurns(turns)
-								this.store.setHints(hints)
-
-								if (gameEnds) {
-									this.gamePlayLogic.handleGameLost()
-								} else {
-									this.store.setGamePlayState(GamePlayState.WRONG_TRIAD)
-								}
-							}
-						}),
-						filter((success) => !success),
-						delay(2000),
-						tap(() => {
-							// Only change the state back to PLAYING if not in WON or LOST state and turns are not exhausted
-							if (
-								this.store.gamePlayState() !== GamePlayState.WON &&
-								this.store.gamePlayState() !== GamePlayState.LOST &&
-								this.turnHintService.numberOfAvailableTurns(this.store.turns()) > 0
-							) {
-								this.store.setGamePlayState(GamePlayState.PLAYING)
-								this.store.setSelectedCues([])
-								this.store.setHintUsage(false)
-								this.store.setHintUsedWithOneTurnRemaining(false)
-							} else if (this.turnHintService.numberOfAvailableTurns(this.store.turns()) === 0) {
-								// If turns are exhausted, ensure game lost state is set
-								this.gamePlayLogic.handleGameLost()
-							}
-						}),
-					)
-					.subscribe({
-						error: (error) => {
-							this.store.setIsCheckingTriad(false)
-							this.handleApiError(error)
-						},
-					}),
-			)
-		}
 	}
 
 	// All turn and hint transitions are now handled by TurnHintService

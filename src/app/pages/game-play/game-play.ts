@@ -39,6 +39,7 @@ const DAILY_GAME_SESSION_STORAGE_KEY = 'triads_daily_game_session_v1'
 const DAILY_PROGRESS_SAVE_DEBOUNCE_MS = 500
 
 interface DailyGameSessionSnapshot {
+	savedAt?: number
 	puzzleDate: string
 	triadGroupId: string | number
 	cues: string[] | null
@@ -213,6 +214,7 @@ export class GamePlay implements OnInit, OnDestroy {
 			}
 
 			const snapshot: DailyGameSessionSnapshot = {
+				savedAt: Date.now(),
 				puzzleDate,
 				triadGroupId,
 				cues: this.store.cues(),
@@ -329,23 +331,32 @@ export class GamePlay implements OnInit, OnDestroy {
 						return
 					}
 
-					// Server-side progress is the durable source of truth — it survives iOS Safari
-					// clearing localStorage. Prefer it; only fall back to the local snapshot when the
-					// server hasn't seen progress yet (legacy attempts).
+					// A tab can close before the debounced server save. Keep the newer
+					// matching snapshot while retaining server recovery after local eviction.
 					const serverSession = this.parseServerProgress(response.progress, response.puzzleDate, response.triadGroupId)
-					if (serverSession) {
-						this.applyDailySession(serverSession)
-						this.lastServerSavedSnapshot = JSON.stringify(serverSession)
-						return
-					}
-
-					const restoredSession = this.getSavedDailySession()
-					const canRestoreSession = restoredSession?.puzzleDate === response.puzzleDate && restoredSession?.triadGroupId === response.triadGroupId
-					if (canRestoreSession && restoredSession) {
-						this.applyDailySession(restoredSession)
-						// Server hasn't seen this snapshot yet — push it now so it's safe even if
-						// localStorage gets evicted before the next state change.
-						this.queueDailyProgressServerSave(restoredSession, { immediate: true })
+					const local = this.getSavedDailySession()
+					const localSession = local?.puzzleDate === response.puzzleDate && local.triadGroupId === response.triadGroupId ? local : null
+					const restored =
+						localSession && (!serverSession || (localSession.savedAt ?? 0) > (serverSession.savedAt ?? 0)) ? localSession : serverSession
+					if (restored) {
+						this.applyDailySession(restored)
+						if (restored.gamePlayState === GamePlayState.WON || restored.gamePlayState === GamePlayState.LOST) {
+							// The original completion request may have failed before reload.
+							// Retry persistence without recording the local score a second time.
+							this.subscriptions$.add(
+								this.gamePlayApi
+									.postDailyComplete(restored.gamePlayState === GamePlayState.WON ? 'won' : 'lost', restored.gameScore)
+									.subscribe({
+										error: (error: unknown) => {
+											if (isApiError(error)) error.markHandled()
+										},
+									}),
+							)
+						} else if (restored === localSession) {
+							this.queueDailyProgressServerSave(restored, { immediate: true })
+						} else {
+							this.lastServerSavedSnapshot = JSON.stringify(restored)
+						}
 						return
 					}
 
@@ -674,24 +685,54 @@ export class GamePlay implements OnInit, OnDestroy {
 		// persisted/server snapshot before the result dialog needs it for sharing.
 		this.store.setDailyPuzzleDate(session.puzzleDate)
 		this.store.setDailyNextPuzzleAt(session.dailyNextPuzzleAt)
-		this.store.setCues(session.cues ?? [])
+		// Timers and requests do not survive a reload. Commit any solved triad
+		// recorded before its bubble-removal animation finished.
+		const normalizeCue = (cue: string) => cue.replace(/^[\s_-]+|[\s_-]+$/g, '').toUpperCase()
+		const remainingCues = [...(session.cues ?? [])]
+		for (const cue of session.solvedTriads.slice(0, 3).flatMap((triad) => triad.cues)) {
+			let index = remainingCues.indexOf(cue)
+			if (index === -1) {
+				// Repair older snapshots with one missing joiner without removing
+				// a different cue that explicitly has the opposite hyphen direction.
+				const candidates = remainingCues
+					.map((value, index) => ({ value, index }))
+					.filter(({ value }) => normalizeCue(value) === normalizeCue(cue) && (value === normalizeCue(value) || cue === normalizeCue(cue)))
+				if (candidates.length === 1) index = candidates[0].index
+			}
+			if (index !== -1) remainingCues.splice(index, 1)
+		}
+		const isTerminal = session.gamePlayState === GamePlayState.WON || session.gamePlayState === GamePlayState.LOST
+		const triadsStep = remainingCues.length === 0 && session.solvedTriads.length >= 3 ? 'FINAL' : session.triadsStep
+		const availableCues = triadsStep === 'FINAL' ? (session.finalTriadCues ?? []) : remainingCues
+		const selectedCues = session.selectedCues.filter((cue) => availableCues.includes(cue))
+		const stableSelection = availableCues.length === 3 ? [...availableCues] : selectedCues
+		const state = isTerminal
+			? session.gamePlayState
+			: stableSelection.length === 3
+				? session.gamePlayState === GamePlayState.ACCEPT_ANSWER || session.gamePlayState === GamePlayState.WRONG_ANSWER
+					? GamePlayState.ACCEPT_ANSWER
+					: GamePlayState.CHECK_SOLUTION
+				: GamePlayState.PLAYING
+		this.store.setCues(remainingCues)
 		this.store.setTriadGroupId(session.triadGroupId)
 		this.store.setFinalTriadCues(session.finalTriadCues)
-		this.store.setSelectedCues(session.selectedCues)
+		this.store.setSelectedCues(stableSelection)
 		this.store.setTurns(session.turns)
 		this.store.setHints(session.hints)
-		this.store.setGamePlayState(session.gamePlayState)
-		this.store.updateTriadStep(session.triadsStep)
-		this.store.setKeywordLengthHint(session.keywordLengthHint)
-		this.store.setFirstLetterHint(session.firstLetterHint)
-		this.store.setActiveHintType(session.activeHintType)
+		this.store.setGamePlayState(state)
+		this.store.updateTriadStep(triadsStep)
+		const sameSelection = stableSelection.length === session.selectedCues.length && stableSelection.every((cue) => session.selectedCues.includes(cue))
+		this.store.setKeywordLengthHint(sameSelection ? session.keywordLengthHint : null)
+		this.store.setFirstLetterHint(sameSelection ? session.firstLetterHint : null)
+		this.store.setActiveHintType(sameSelection ? session.activeHintType : null)
 		this.store.resetUsedHintTypes()
-		for (const hintType of session.usedHintTypes) {
+		for (const hintType of sameSelection ? session.usedHintTypes : []) {
 			this.store.addUsedHintType(hintType)
 		}
 		this.store.setTriadHintSnapshots(session.triadHintSnapshots ?? {})
-		this.store.setHintUsage(session.hintUsed)
-		this.store.setHintUsedWithOneTurnRemaining(session.hintUsedWithOneTurnRemaining)
+		const pendingHintOutcome = sameSelection && session.gamePlayState === GamePlayState.ACCEPT_ANSWER
+		this.store.setHintUsage(pendingHintOutcome && session.hintUsed)
+		this.store.setHintUsedWithOneTurnRemaining(pendingHintOutcome && session.hintUsedWithOneTurnRemaining)
 		this.store.setGameScore(session.gameScore)
 		this.store.setUnsolvedTriads(session.unsolvedTriads)
 		this.store.setDailyStandaloneResult(session.gamePlayState === GamePlayState.WON || session.gamePlayState === GamePlayState.LOST)
@@ -699,6 +740,8 @@ export class GamePlay implements OnInit, OnDestroy {
 			this.store.addSolvedTriad(solvedTriad)
 		}
 		this.cueFetchingState.set(RequestState.READY)
+		if (!isTerminal && session.solvedTriads.length === 4) this.gamePlayLogic.handleGameWon()
+		else if (!isTerminal && !session.turns.some((turn) => turn.available)) void this.gamePlayLogic.handleGameLost()
 	}
 
 	private getSavedDailySession(): DailyGameSessionSnapshot | null {
@@ -708,7 +751,9 @@ export class GamePlay implements OnInit, OnDestroy {
 		}
 
 		try {
-			return JSON.parse(rawSnapshot) as DailyGameSessionSnapshot
+			const parsed = this.validateDailySession(JSON.parse(rawSnapshot))
+			if (!parsed) this.clearDailySession()
+			return parsed
 		} catch {
 			this.clearDailySession()
 			return null
@@ -731,11 +776,44 @@ export class GamePlay implements OnInit, OnDestroy {
 		if (!raw || typeof raw !== 'object') {
 			return null
 		}
-		const snapshot = raw as Partial<DailyGameSessionSnapshot>
-		if (snapshot.puzzleDate !== puzzleDate || snapshot.triadGroupId !== triadGroupId) {
+		const snapshot = this.validateDailySession(raw)
+		if (!snapshot || snapshot.puzzleDate !== puzzleDate || snapshot.triadGroupId !== triadGroupId) {
 			return null
 		}
-		return snapshot as DailyGameSessionSnapshot
+		return snapshot
+	}
+
+	private validateDailySession(raw: unknown): DailyGameSessionSnapshot | null {
+		if (!raw || typeof raw !== 'object') return null
+		const session = raw as DailyGameSessionSnapshot
+		const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string')
+		const triads = (value: unknown): boolean =>
+			Array.isArray(value) &&
+			value.every((item) => item && typeof item.id === 'number' && typeof item.keyword === 'string' && strings(item.cues) && strings(item.fullPhrases))
+		const tokens = (value: unknown): boolean =>
+			Array.isArray(value) && value.every((item) => item && typeof item.id === 'number' && typeof item.available === 'boolean')
+		if (
+			(session.savedAt !== undefined && (!Number.isFinite(session.savedAt) || session.savedAt < 0)) ||
+			typeof session.puzzleDate !== 'string' ||
+			!['string', 'number'].includes(typeof session.triadGroupId) ||
+			(session.cues !== null && !strings(session.cues)) ||
+			(session.finalTriadCues !== null && !strings(session.finalTriadCues)) ||
+			!strings(session.selectedCues) ||
+			!tokens(session.turns) ||
+			!tokens(session.hints) ||
+			!triads(session.solvedTriads) ||
+			(session.unsolvedTriads !== null && !triads(session.unsolvedTriads)) ||
+			!Object.values(GamePlayState).includes(session.gamePlayState) ||
+			!['INITIAL', 'FINAL'].includes(session.triadsStep) ||
+			!Array.isArray(session.usedHintTypes) ||
+			(session.keywordLengthHint !== null && (!Number.isInteger(session.keywordLengthHint) || session.keywordLengthHint < 1)) ||
+			(session.firstLetterHint !== null && typeof session.firstLetterHint !== 'string') ||
+			typeof session.hintUsed !== 'boolean' ||
+			typeof session.hintUsedWithOneTurnRemaining !== 'boolean' ||
+			!Number.isFinite(session.gameScore)
+		)
+			return null
+		return session
 	}
 
 	private queueDailyProgressServerSave(snapshot: DailyGameSessionSnapshot, options: { immediate?: boolean } = {}) {

@@ -6,6 +6,7 @@ import { User } from './user.interface'
 
 /** Letter/length hints for a specific trio of cues (keyed by sorted cue set in the store). */
 export interface TriadHintSnapshot {
+	usedHintTypes?: ('KEYWORD_LENGTH' | 'FIRST_LETTER')[]
 	keywordLengthHint: number | null
 	firstLetterHint: string | null
 	activeHintType: 'KEYWORD_LENGTH' | 'FIRST_LETTER' | null

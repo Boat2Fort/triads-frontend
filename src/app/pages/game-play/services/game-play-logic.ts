@@ -31,6 +31,7 @@ export class GamePlayLogic {
 	}
 
 	handleGameWon() {
+		if (this.isGameOver()) return
 		// Score updates
 		const score = this.calculateScore()
 
@@ -60,6 +61,7 @@ export class GamePlayLogic {
 	}
 
 	async handleGameLost() {
+		if (this.isGameOver()) return
 		// Score updates
 		const score = this.calculateScore()
 
@@ -93,12 +95,14 @@ export class GamePlayLogic {
 
 	private async fetchAndSetUnsolvedTriads() {
 		const triadGroupId = this.store.triadGroupId()
+		const isCurrentLoss = () => this.store.triadGroupId() === triadGroupId && this.store.gamePlayState() === GamePlayState.LOST
 		if (!triadGroupId) {
 			return
 		}
 
 		try {
 			const allTriads = await firstValueFrom(this.gamePlayApi.getTriadGroupSolutions(triadGroupId))
+			if (!isCurrentLoss()) return
 			const triadsStep = this.store.triadsStep()
 			const solvedTriads = this.store.solvedTriads()
 			const finalTriadCues = this.store.finalTriadCues()
@@ -128,11 +132,13 @@ export class GamePlayLogic {
 				}
 			}
 
-			this.store.setUnsolvedTriads(unsolvedTriads.length > 0 ? unsolvedTriads : null)
+			if (isCurrentLoss()) this.store.setUnsolvedTriads(unsolvedTriads.length > 0 ? unsolvedTriads : null)
 		} catch (error) {
 			// Silently fail - don't show solutions if API call fails
-			console.error('Failed to fetch unsolved triads:', error)
-			this.store.setUnsolvedTriads(null)
+			if (isCurrentLoss()) {
+				console.error('Failed to fetch unsolved triads:', error)
+				this.store.setUnsolvedTriads(null)
+			}
 		}
 	}
 
@@ -154,6 +160,10 @@ export class GamePlayLogic {
 		}
 		this.store.setUser(newUser)
 		this.userService.setUser(newUser)
+	}
+
+	private isGameOver(): boolean {
+		return this.store.gamePlayState() === GamePlayState.WON || this.store.gamePlayState() === GamePlayState.LOST
 	}
 
 	calculateScore() {

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing'
-import { of } from 'rxjs'
+import { of, Subject } from 'rxjs'
 
 import { User } from '../../../shared/interfaces/user.interface'
 import { UserService } from '../../../shared/services/user.service'
@@ -13,6 +13,7 @@ describe('GamePlayLogic', () => {
 	let service: GamePlayLogic
 	let mockStore: {
 		gameMode: jasmine.Spy
+		gamePlayState: jasmine.Spy
 		user: jasmine.Spy
 		turns: jasmine.Spy
 		hints: jasmine.Spy
@@ -24,6 +25,7 @@ describe('GamePlayLogic', () => {
 		setDailyNextPuzzleAt: jasmine.Spy
 		setClassicExtraQuota: jasmine.Spy
 		triadGroupId: jasmine.Spy
+		setUnsolvedTriads: jasmine.Spy
 	}
 	let userService: jasmine.SpyObj<UserService>
 	let gamePlayApi: jasmine.SpyObj<GamePlayApi>
@@ -38,6 +40,7 @@ describe('GamePlayLogic', () => {
 	beforeEach(() => {
 		mockStore = {
 			gameMode: jasmine.createSpy('gameMode').and.returnValue('daily'),
+			gamePlayState: jasmine.createSpy('gamePlayState').and.returnValue(GamePlayState.PLAYING),
 			user: jasmine.createSpy('user').and.returnValue(baseUser),
 			turns: jasmine.createSpy('turns').and.returnValue([]),
 			hints: jasmine.createSpy('hints').and.returnValue([]),
@@ -49,9 +52,11 @@ describe('GamePlayLogic', () => {
 			setDailyNextPuzzleAt: jasmine.createSpy('setDailyNextPuzzleAt'),
 			setClassicExtraQuota: jasmine.createSpy('setClassicExtraQuota'),
 			triadGroupId: jasmine.createSpy('triadGroupId').and.returnValue(null),
+			setUnsolvedTriads: jasmine.createSpy('setUnsolvedTriads'),
 		}
+		mockStore.setGamePlayState.and.callFake((state: GamePlayState) => mockStore.gamePlayState.and.returnValue(state))
 		userService = jasmine.createSpyObj<UserService>('UserService', ['setUser'])
-		gamePlayApi = jasmine.createSpyObj<GamePlayApi>('GamePlayApi', ['postDailyComplete', 'getDailyTodayInfo'])
+		gamePlayApi = jasmine.createSpyObj<GamePlayApi>('GamePlayApi', ['postDailyComplete', 'getDailyTodayInfo', 'getTriadGroupSolutions'])
 		gamePlayApi.postDailyComplete.and.returnValue(of({ ok: true as const, puzzleDate: '2026-05-28', nextPuzzleAt: '2026-05-29T09:00:00.000Z' }))
 		gamePlayApi.getDailyTodayInfo.and.returnValue(
 			of({
@@ -151,5 +156,31 @@ describe('GamePlayLogic', () => {
 		expect(mockStore.setUser).not.toHaveBeenCalled()
 		expect(userService.setUser).not.toHaveBeenCalled()
 		expect(gamePlayApi.postDailyComplete).not.toHaveBeenCalled()
+	})
+	it('records a loss once even when both immediate and delayed failure callbacks run', async () => {
+		turnHintService.numberOfAvailableTurns.and.returnValue(0)
+		await service.handleGameLost()
+		await service.handleGameLost()
+		expect(gamePlayApi.postDailyComplete).toHaveBeenCalledTimes(1)
+		expect(userService.setUser).toHaveBeenCalledTimes(1)
+	})
+
+	it('does not record another result after the game has been won', async () => {
+		service.handleGameWon()
+		service.handleGameWon()
+		await service.handleGameLost()
+		expect(gamePlayApi.postDailyComplete).toHaveBeenCalledTimes(1)
+		expect(mockStore.setGamePlayState).toHaveBeenCalledOnceWith(GamePlayState.WON)
+	})
+	it('does not reveal the previous game’s solutions after a new game starts', async () => {
+		const response = new Subject<import('../interfaces/triad.interface').SolvedTriad[]>()
+		gamePlayApi.getTriadGroupSolutions.and.returnValue(response)
+		mockStore.triadGroupId.and.returnValue(7)
+		const pending = service.handleGameLost()
+		mockStore.triadGroupId.and.returnValue(8)
+		mockStore.gamePlayState.and.returnValue(GamePlayState.PLAYING)
+		response.next([])
+		await pending
+		expect(mockStore.setUnsolvedTriads).not.toHaveBeenCalled()
 	})
 })
