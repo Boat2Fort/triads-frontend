@@ -48,6 +48,26 @@ describe('EditTriadGroupDialog', () => {
 		expect(component.whenCanceled.emit).toHaveBeenCalled()
 	})
 
+	it('keeps typing in the first word of a two-word phrase', () => {
+		const control = component.triad1Group.controls['fullPhrase1']
+		control.setValue('RED APPLE')
+		fixture.detectChanges()
+		const input: HTMLInputElement = fixture.nativeElement.querySelector('#edit-triad1-fullPhrase1')
+		input.focus()
+		input.setSelectionRange(0, 3)
+
+		for (const [index, character] of [...'blue'].entries()) {
+			input.setRangeText(character, input.selectionStart!, input.selectionEnd!, 'end')
+			input.dispatchEvent(new Event('input', { bubbles: true }))
+			fixture.detectChanges()
+			const expected = `${'BLUE'.slice(0, index + 1)} APPLE`
+			expect(input.value).toBe(expected)
+			expect(control.value).toBe(expected)
+			expect(input.selectionStart).toBe(index + 1)
+			expect(input.selectionEnd).toBe(index + 1)
+		}
+	})
+
 	it('should validate and emit whenSaved on valid submit', () => {
 		spyOn(component.whenSaved, 'emit')
 		component.onSubmit()
