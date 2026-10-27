@@ -1,3 +1,4 @@
+import { HttpClient } from '@angular/common/http'
 import {
 	afterNextRender,
 	ChangeDetectionStrategy,
@@ -16,6 +17,7 @@ import { IonModal } from '@ionic/angular/standalone'
 import { Subject, takeUntil } from 'rxjs'
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators'
 
+import { Dialog } from '../../shared/components/dialog/dialog'
 import { minDailySchedulePuzzleDateYmd } from '../../shared/constants/daily-schedule.constant'
 import { Difficulty } from '../../shared/enums/difficulty.enum'
 import { ApiError } from '../../shared/errors/api-error.model'
@@ -49,12 +51,42 @@ interface CategorizedPublicTriadGroupsExport {
 @Component({
 	selector: 'app-triad-management',
 	standalone: true,
-	imports: [TriadGroupCard, AddTriadGroupDialog, EditTriadGroupDialog, DeleteConfirmationDialog, IonModal],
+	imports: [Dialog, TriadGroupCard, AddTriadGroupDialog, EditTriadGroupDialog, DeleteConfirmationDialog, IonModal],
 	templateUrl: './triad-management.page.html',
 	styleUrl: './triad-management.page.scss',
 	changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TriadManagementPage implements OnInit, OnDestroy {
+	showMagazineReport = signal(false)
+
+	magazineReportLoading = signal(false)
+
+	magazineReportError = signal(false)
+
+	magazineReport = signal<{ visitors: number; players: number; completed: number; returned: number } | null>(null)
+
+	private readonly http = inject(HttpClient)
+
+	openMagazineReport() {
+		this.showMagazineReport.set(true)
+		this.loadMagazineReport()
+	}
+
+	loadMagazineReport() {
+		this.magazineReportLoading.set(true)
+		this.magazineReportError.set(false)
+		this.http.get<{ visitors: number; players: number; completed: number; returned: number }>('triads/daily/magazine/report').subscribe({
+			next: (report) => {
+				this.magazineReport.set(report)
+				this.magazineReportLoading.set(false)
+			},
+			error: () => {
+				this.magazineReportError.set(true)
+				this.magazineReportLoading.set(false)
+			},
+		})
+	}
+
 	triadGroups = signal<TriadGroup[]>([])
 
 	triadGroupStats = signal<TriadGroupStats>({

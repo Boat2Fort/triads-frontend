@@ -23,6 +23,12 @@
 					</button>
 				</div>
 				<div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+					<button
+						type="button"
+						(click)="openMagazineReport()"
+						class="px-4 py-2 rounded-lg border border-violet-200 bg-base-100 text-violet-700 hover:bg-violet-50 font-semibold shadow-sm">
+						Magazine report
+					</button>
 					<!-- Search Input -->
 					<div class="relative flex-1 sm:flex-initial">
 						<input
@@ -141,6 +147,45 @@
 			}
 		</div>
 	</div>
+
+	<ion-modal [isOpen]="showMagazineReport()" (didDismiss)="showMagazineReport.set(false)">
+		<ng-template>
+			<app-dialog title="Magazine report" (whenClosed)="showMagazineReport.set(false)">
+				<div class="text-center space-y-4">
+					<p class="text-sm">triads.gametrix.org/magazine</p>
+					@if (magazineReportLoading()) {
+						<p role="status">Loading report...</p>
+					} @else if (magazineReportError()) {
+						<p role="alert">Unable to load the report.</p>
+						<button type="button" class="btn btn-outline" (click)="loadMagazineReport()">Try again</button>
+					} @else if (magazineReport(); as report) {
+						<dl class="space-y-3">
+							<div>
+								<dt>Unique visitors</dt>
+								<dd class="font-bold">{{ report.visitors }}</dd>
+							</div>
+							<div>
+								<dt>New Daily players</dt>
+								<dd class="font-bold">{{ report.players }}</dd>
+							</div>
+							<div>
+								<dt>Completed first Daily</dt>
+								<dd class="font-bold">{{ report.completed }}</dd>
+							</div>
+							<div>
+								<dt>Returned on a later day</dt>
+								<dd class="font-bold">
+									{{ report.returned }} ({{ report.players ? ((report.returned / report.players) * 100).toFixed(0) : 0 }}%)
+								</dd>
+							</div>
+						</dl>
+						<p class="text-sm">Days follow Eastern Time. Counts represent browsers.</p>
+					}
+					<button type="button" class="btn btn-primary" (click)="showMagazineReport.set(false)">Close</button>
+				</div>
+			</app-dialog>
+		</ng-template>
+	</ion-modal>
 
 	<!-- Add Dialog -->
 	<ion-modal [isOpen]="showAddDialog()" (didDismiss)="onAddDialogCanceled()">

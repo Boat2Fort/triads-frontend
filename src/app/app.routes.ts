@@ -18,6 +18,10 @@ export const mainRoutes: Routes = [
 				pathMatch: 'full',
 			},
 			{
+				path: 'magazine',
+				loadComponent: () => import('./pages/magazine-entry').then((m) => m.MagazineEntry),
+			},
+			{
 				path: 'classic',
 				component: GamePlay,
 				data: { mode: 'classic' },
